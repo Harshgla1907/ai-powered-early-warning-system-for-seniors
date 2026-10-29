@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Samarth Early Warning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Mukta:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Samarth <span>Early Warning</span></div>
+    <nav id="nav">
+      <a href="#coordinator" data-nav="coordinator">Care Coordinator</a>
+      <a href="#senior" data-nav="senior">Senior check-in</a>
+      <a href="#member" data-nav="member">My health</a>
+      <a href="#family" data-nav="family">Family</a>
+      <a href="#operations" data-nav="operations">Operations</a>
+    </nav>
+    <div class="language-switch" aria-label="Choose language">
+      <button type="button" data-lang="en" class="active">EN</button>
+      <button type="button" data-lang="hi">हिं</button>
+    </div>
+  </header>
+  <main id="view"></main>
+
+  <script src="js/data.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/views.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
