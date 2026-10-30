@@ -133,6 +133,18 @@ for (const row of seed) {
     row[10], row[11], JSON.stringify(row[12]));
 }
 
+const followupCount = db.prepare("SELECT COUNT(*) AS count FROM followups").get().count;
+if (followupCount === 0) {
+  const seedFollowups = db.prepare(`
+    INSERT INTO followups (senior_id, action, status, created_at)
+    VALUES (?, ?, 'pending', datetime('now'))
+  `);
+  for (const id of [1, 2, 3]) {
+    const row = db.prepare("SELECT name, action FROM seniors WHERE id = ?").get(id);
+    if (row) seedFollowups.run(id, row.action);
+  }
+}
+
 function toSenior(row) {
   return {
     id: row.id, name: row.name, age: row.age, city: row.city, lang: row.lang, score: row.score,
@@ -457,7 +469,18 @@ app.post("/api/alerts/:id/feedback", (req, res) => {
 app.get("/api/operations", (req, res) => {
   const cityRows = db.prepare("SELECT city, COUNT(*) AS alerts FROM seniors GROUP BY city ORDER BY alerts DESC").all();
   const feedbackRows = db.prepare("SELECT useful, COUNT(*) AS count FROM alert_feedback GROUP BY useful").all();
-  res.json({ cities: cityRows, feedback: feedbackRows, pendingFollowups: db.prepare("SELECT COUNT(*) AS count FROM followups WHERE status = 'pending'").get().count });
+  res.json({
+    cities: cityRows,
+    feedback: feedbackRows,
+    pendingFollowups: db.prepare("SELECT COUNT(*) AS count FROM followups WHERE status = 'pending'").get().count,
+    completedFollowups: db.prepare("SELECT COUNT(*) AS count FROM followups WHERE status = 'completed'").get().count,
+    totalSeniors: db.prepare("SELECT COUNT(*) AS count FROM seniors").get().count,
+    highPriority: db.prepare("SELECT COUNT(*) AS count FROM seniors WHERE score >= 70").get().count,
+    mediumPriority: db.prepare("SELECT COUNT(*) AS count FROM seniors WHERE score >= 45 AND score < 70").get().count,
+    checkins: db.prepare("SELECT COUNT(*) AS count FROM checkins").get().count,
+    memberUpdates: db.prepare("SELECT COUNT(*) AS count FROM member_updates").get().count,
+    vitalsRecorded: db.prepare("SELECT COUNT(*) AS count FROM vitals").get().count
+  });
 });
 
 app.post("/api/vitals", (req, res) => {

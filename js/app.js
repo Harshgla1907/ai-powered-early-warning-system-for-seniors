@@ -16,6 +16,9 @@ const state = {
   memberAnalysis: null,
   memberVitals: { systolic: "", diastolic: "", pulse: "", spo2: "", glucose: "" },
   operations: null,
+  memberSenior: 1,
+  memberVitalsHistory: [],
+  memberUpdates: [],
   checkinAnswers: [],
   voiceStatus: "",
   voiceRecognition: null,
@@ -312,8 +315,6 @@ view.addEventListener("click", e => {
 
   if (d.id) state.selected = Number(d.id);
   if (d.filter) { state.filter = d.filter; state.selected = null; }
-  if (d.done) state.done.add(Number(d.done));
-  if (d.fb) state.feedback[d.sid] = d.fb;
   if (d.lang) state.lang = d.lang;
   if (d.answer) {
     const question = QUESTIONS[state.step];
@@ -374,6 +375,12 @@ view.addEventListener("change", e => {
     state.familySenior = Number(e.target.value);
     render();
   }
+  if (e.target.id === "memberPick") {
+    state.memberSenior = Number(e.target.value);
+    state.memberSubmitted = false;
+    state.memberAnalysis = null;
+    loadMemberDataFromApi();
+  }
 });
 
 view.addEventListener("input", e => {
@@ -401,11 +408,34 @@ async function loadSeniorsFromApi() {
     }
     const seniors = await response.json();
     SENIORS.splice(0, SENIORS.length, ...seniors);
+    state.done.clear();
+    state.feedback = {};
+    seniors.forEach(senior => {
+      if (senior.done) state.done.add(senior.id);
+      if (senior.feedback) state.feedback[senior.id] = senior.feedback;
+    });
     setApiStatus("success", "Senior data loaded successfully.");
   } catch {
-    setApiStatus("error", "Backend unavailable. Showing the last available demo data.", true);
+    setApiStatus("error", "Backend unavailable. No live senior data could be loaded.", true);
   }
   render();
+}
+
+async function loadMemberDataFromApi() {
+  const seniorId = state.memberSenior || 1;
+  try {
+    const [vitalsResponse, updatesResponse] = await Promise.all([
+      fetch(`/api/vitals/${seniorId}`),
+      fetch(`/api/member-updates/${seniorId}`)
+    ]);
+    if (!vitalsResponse.ok || !updatesResponse.ok) throw new Error("Member history unavailable");
+    state.memberVitalsHistory = await vitalsResponse.json();
+    state.memberUpdates = await updatesResponse.json();
+    render();
+  } catch {
+    state.memberVitalsHistory = [];
+    state.memberUpdates = [];
+  }
 }
 
 async function loadOperationsFromApi() {
@@ -452,6 +482,7 @@ async function submitCheckin(answers, voiceUsed) {
     if (!response.ok) throw new Error("Check-in submission failed");
     setApiStatus("success", "Check-in submitted.");
   } catch {
+    apiRetryAction = () => submitCheckin(answers, voiceUsed);
     setApiStatus("error", "Check-in was not saved. Please retry.", true);
   }
 }
@@ -464,7 +495,7 @@ async function submitMemberUpdate(currentState) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        seniorId: 1,
+        seniorId: currentState.memberSenior || 1,
         concerns: Array.from(currentState.memberConcerns),
         literacy: currentState.memberLiteracy,
         notes: currentState.memberOther,
@@ -483,12 +514,13 @@ async function submitMemberUpdate(currentState) {
       const vitalsResponse = await fetch("/api/vitals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seniorId: 1, ...vitals, source: "member_voice_or_manual" })
+        body: JSON.stringify({ seniorId: currentState.memberSenior || 1, ...vitals, source: "member_voice_or_manual" })
       });
       if (!vitalsResponse.ok) throw new Error("Vitals could not be saved");
     }
     currentState.memberSubmitted = true;
     setApiStatus("success", "Health update shared with the care team.");
+    await loadMemberDataFromApi();
     render();
   } catch {
     currentState.memberSubmitted = false;
@@ -517,6 +549,7 @@ document.addEventListener("click", e => {
     }).then(response => {
       if (!response.ok) throw new Error("Feedback failed");
       setApiStatus("success", "Feedback saved.");
+      loadSeniorsFromApi();
       loadOperationsFromApi();
     }).catch(() => {
       apiRetryAction = () => updateSeniorInApi(Number(button.dataset.sid), { feedback: button.dataset.fb });
@@ -527,4 +560,5 @@ document.addEventListener("click", e => {
 
 loadSeniorsFromApi();
 loadOperationsFromApi();
+loadMemberDataFromApi();
 window.scrollTo({ top: 0, behavior: "smooth" });

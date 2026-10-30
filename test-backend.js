@@ -88,6 +88,25 @@ async function run() {
     throw new Error("Vitals history API failed");
   }
 
+  const operations = await request("/api/operations");
+  if (operations.status !== 200 || operations.body.totalSeniors < 14) {
+    throw new Error("Live operations API failed");
+  }
+
+  const memberHistory = await request("/api/member-updates/1");
+  if (memberHistory.status !== 200 || !Array.isArray(memberHistory.body) || !memberHistory.body.length) {
+    throw new Error("Member history API failed");
+  }
+
+  const followup = await request("/api/seniors/1", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ done: true })
+  });
+  if (followup.status !== 200 || followup.body.done !== true) {
+    throw new Error("Follow-up persistence API failed");
+  }
+
   const invalidRisk = await request("/api/risk/calculate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

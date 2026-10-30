@@ -134,6 +134,15 @@ function seniorView(state) {
 }
 
 function memberView(state) {
+  const selectedMember = SENIORS.find(s => s.id === (state.memberSenior || 1)) || SENIORS[0];
+  const latestVitals = state.memberVitalsHistory?.[0] || null;
+  const bp = latestVitals?.systolic && latestVitals?.diastolic
+    ? `${latestVitals.systolic}/${latestVitals.diastolic}`
+    : selectedMember?.vitals?.bp || "Not recorded";
+  const pulse = latestVitals?.pulse ? `${latestVitals.pulse} bpm` : "Not recorded";
+  const spo2 = latestVitals?.spo2 ? `${latestVitals.spo2}%` : selectedMember?.vitals?.spo2 || "Not recorded";
+  const glucose = latestVitals?.glucose ? String(latestVitals.glucose) : selectedMember?.vitals?.sugar || "Not recorded";
+  const memberOptions = SENIORS.map(s => `<option value="${s.id}" ${s.id === (state.memberSenior || 1) ? "selected" : ""}>${s.name}</option>`).join("");
   const concernOptions = [
     { key: "bp", icon: "01", label: copy(state, "Blood pressure is high", "ब्लड प्रेशर बढ़ रहा है"), detail: copy(state, "Headache, dizziness, high reading or feeling unwell", "सिरदर्द, चक्कर, रीडिंग ज्यादा या असहजता") },
     { key: "medicine", icon: "02", label: copy(state, "Medicine problem", "दवा से जुड़ी परेशानी"), detail: copy(state, "Missed dose, side effects or confusion about medicines", "दवा छूटना, साइड इफेक्ट या दवा लेने में उलझन") },
@@ -180,12 +189,13 @@ function memberView(state) {
           <span>${copy(state, "Today's check-in", "आज का चेक-इन")}</span>
           <b>${state.memberConcerns.size ? copy(state, `${state.memberConcerns.size} problem${state.memberConcerns.size === 1 ? "" : "s"} selected`, `${state.memberConcerns.size} समस्याएँ चुनी गईं`) : copy(state, "Not completed yet", "अभी पूरा नहीं हुआ")}</b>
         </div>
+        <div class="picker"><span>${copy(state, "Member profile", "सदस्य प्रोफ़ाइल")}</span><select id="memberPick">${memberOptions}</select></div>
       </section>
       <section class="health-metrics" aria-label="${copy(state, "Today's health summary", "आज का स्वास्थ्य सारांश")}">
-        <div class="health-metric bp"><span>${copy(state, "Blood pressure", "ब्लड प्रेशर")}</span><b>158/96</b><small>${copy(state, "Outside personal baseline", "अपनी सामान्य सीमा से बाहर")}</small></div>
-        <div class="health-metric sleep"><span>${copy(state, "Sleep last night", "कल रात की नींद")}</span><b>4.5 hrs</b><small>${copy(state, "3 hrs less than usual", "सामान्य से 3 घंटे कम")}</small></div>
-        <div class="health-metric heart"><span>${copy(state, "Heart rate", "हार्ट रेट")}</span><b>78 bpm</b><small>${copy(state, "Within usual range", "सामान्य सीमा में")}</small></div>
-        <div class="health-metric spo2"><span>SpO2</span><b>96%</b><small>${copy(state, "Checked this morning", "आज सुबह जाँच हुई")}</small></div>
+        <div class="health-metric bp"><span>${copy(state, "Blood pressure", "ब्लड प्रेशर")}</span><b>${bp}</b><small>${copy(state, "Latest recorded reading", "नवीनतम दर्ज रीडिंग")}</small></div>
+        <div class="health-metric heart"><span>${copy(state, "Heart rate", "हार्ट रेट")}</span><b>${pulse}</b><small>${copy(state, "Latest recorded pulse", "नवीनतम दर्ज धड़कन")}</small></div>
+        <div class="health-metric spo2"><span>SpO2</span><b>${spo2}</b><small>${copy(state, "Latest recorded value", "नवीनतम दर्ज मान")}</small></div>
+        <div class="health-metric sleep"><span>${copy(state, "Sugar", "शुगर")}</span><b>${glucose}</b><small>${copy(state, "Latest recorded value", "नवीनतम दर्ज मान")}</small></div>
       </section>
       ${submitted}
       <div class="member-grid">
@@ -204,9 +214,9 @@ function memberView(state) {
           <div class="wellbeing-card">
             <div>
               <span>${copy(state, "Wellbeing snapshot", "स्वास्थ्य स्थिति")}</span>
-              <b>${copy(state, "Needs attention", "ध्यान देना ज़रूरी")}</b>
+              <b>${selectedMember.score >= 70 ? copy(state, "Needs attention", "ध्यान देना ज़रूरी") : selectedMember.score >= 45 ? copy(state, "Keep watching", "नज़र बनाए रखें") : copy(state, "Stable", "स्थिर")}</b>
             </div>
-            <div class="wellbeing-ring"><span>86</span><small>risk</small></div>
+            <div class="wellbeing-ring"><span>${selectedMember.score}</span><small>risk</small></div>
           </div>
         </section>
       </div>
@@ -292,34 +302,36 @@ function familyView(state) {
 function operationsView(state) {
   const live = state.operations;
   const liveCities = live?.cities?.map(c => ({ city: c.city, alerts: c.alerts, avgResponse: 3 })) || null;
-  const cityData = liveCities || CITY_ALERTS;
-  const total = cityData.reduce((n, c) => n + c.alerts, 0);
-  const avg = (cityData.reduce((n, c) => n + c.avgResponse, 0) / cityData.length).toFixed(1);
+  const cityData = liveCities || [];
+  const total = live?.highPriority ?? 0;
+  const avg = live?.checkins ?? 0;
   const maxAlerts = Math.max(...cityData.map(c => c.alerts), 1);
   const feedbackRows = live?.feedback || [];
   const usefulCount = feedbackRows.find(f => f.useful === 1)?.count || 0;
   const feedbackTotal = feedbackRows.reduce((sum, f) => sum + f.count, 0);
   const usefulPct = feedbackTotal ? Math.round((usefulCount / feedbackTotal) * 100) : 71;
-  const pendingFollowups = live?.pendingFollowups ?? 12;
+  const pendingFollowups = live?.pendingFollowups ?? 0;
+  const completedFollowups = live?.completedFollowups ?? 0;
+  const followupTotal = pendingFollowups + completedFollowups;
+  const resolvedPct = followupTotal ? Math.round((completedFollowups / followupTotal) * 100) : 0;
   const rows = cityData
     .map((c, index) => `
       <tr>
         <td><span class="city-rank">${index + 1}</span><b>${c.city}</b></td>
         <td><span class="city-volume"><i style="width:${Math.round((c.alerts / maxAlerts) * 100)}%"></i></span><b>${c.alerts}</b></td>
-        <td><span class="response-chip ${c.avgResponse <= 3 ? "fast" : c.avgResponse <= 4 ? "normal" : "slow"}">${c.avgResponse} hrs</span></td>
+        <td><span class="response-chip normal">${copy(state, "Database record", "डेटाबेस रिकॉर्ड")}</span></td>
       </tr>`)
     .join("");
-  const outcomeRows = OUTCOMES.map(o => `
+  const outcomeRows = [
+    { label: copy(state, "Follow-ups completed", "फ़ॉलो-अप पूरा"), pct: resolvedPct },
+    { label: copy(state, "Follow-ups pending", "फ़ॉलो-अप लंबित"), pct: followupTotal ? Math.round((pendingFollowups / followupTotal) * 100) : 0 },
+    { label: copy(state, "Member updates", "सदस्य अपडेट"), pct: live?.memberUpdates || 0 },
+    { label: copy(state, "Vitals recorded", "वाइटल दर्ज"), pct: live?.vitalsRecorded || 0 }
+  ].map(o => `
     <div class="outcome-row">
-      <span>${copy(state, o.label, ({
-        "Doctor visit": "डॉक्टर से मुलाकात",
-        "Call resolved": "कॉल से समाधान",
-        "Medicine review": "दवा की समीक्षा",
-        "Family told": "परिवार को जानकारी",
-        "No action": "कोई कार्रवाई नहीं"
-      })[o.label])}</span>
-      <div class="outcome-track"><i style="width:${o.pct}%"></i></div>
-      <b>${o.pct}%</b>
+      <span>${o.label}</span>
+      <div class="outcome-track"><i style="width:${Math.min(o.pct, 100)}%"></i></div>
+      <b>${o.pct}${o.pct <= 100 && (o.label.includes("Follow") || o.label.includes("फ़ॉलो")) ? "%" : ""}</b>
     </div>`).join("");
   return `
     <div class="operations-dashboard">
@@ -332,8 +344,8 @@ function operationsView(state) {
         <div class="operations-period"><span>${copy(state, "Reporting period", "रिपोर्ट अवधि")}</span><b>${copy(state, "Last 30 days", "पिछले 30 दिन")}</b></div>
       </section>
       <div class="kpis operations-kpis">
-        <div class="panel kpi accent-teal"><span class="kpi-icon">↗</span><b>${total}</b><span>${copy(state, "Priority alerts raised", "प्राथमिकता अलर्ट")}</span><small>${copy(state, "Across 6 active cities", "6 सक्रिय शहरों में")}</small></div>
-        <div class="panel kpi accent-blue"><span class="kpi-icon">◷</span><b>${avg} ${copy(state, "hrs", "घंटे")}</b><span>${copy(state, "Average response time", "औसत प्रतिक्रिया समय")}</span><small>${copy(state, "0.6 hrs faster this month", "इस महीने 0.6 घंटे तेज़")}</small></div>
+        <div class="panel kpi accent-teal"><span class="kpi-icon">↗</span><b>${total}</b><span>${copy(state, "High-priority seniors", "उच्च प्राथमिकता वरिष्ठ")}</span><small>${copy(state, `${live?.totalSeniors || 0} total seniors`, `कुल ${live?.totalSeniors || 0} वरिष्ठ`)}</small></div>
+        <div class="panel kpi accent-blue"><span class="kpi-icon">◷</span><b>${avg}</b><span>${copy(state, "Check-ins recorded", "चेक-इन दर्ज")}</span><small>${copy(state, "From the live database", "लाइव डेटाबेस से")}</small></div>
         <div class="panel kpi accent-green"><span class="kpi-icon">✓</span><b>${usefulPct}%</b><span>${copy(state, "Alerts useful to the team", "टीम के लिए उपयोगी अलर्ट")}</span><small>${copy(state, "Based on live feedback", "लाइव प्रतिक्रिया पर आधारित")}</small></div>
         <div class="panel kpi accent-purple"><span class="kpi-icon">◎</span><b>${pendingFollowups}</b><span>${copy(state, "Pending follow-ups", "लंबित फ़ॉलो-अप")}</span><small>${copy(state, "From the live database", "लाइव डेटाबेस से")}</small></div>
       </div>
@@ -345,15 +357,15 @@ function operationsView(state) {
       </section>
       <div class="operations-grid">
         <section class="panel operations-table-card">
-          <div class="analytics-heading"><div><p class="eyebrow">${copy(state, "Response coverage", "प्रतिक्रिया कवरेज")}</p><h2>${copy(state, "Alerts by city", "शहर के अनुसार अलर्ट")}</h2></div><span class="live-chip"><i></i>${copy(state, "Live demo", "लाइव डेमो")}</span></div>
+          <div class="analytics-heading"><div><p class="eyebrow">${copy(state, "Response coverage", "प्रतिक्रिया कवरेज")}</p><h2>${copy(state, "Seniors by city", "शहर के अनुसार वरिष्ठ")}</h2></div><span class="live-chip"><i></i>${copy(state, "Live database", "लाइव डेटाबेस")}</span></div>
           <table class="operations-table">
-            <thead><tr><th>${copy(state, "City", "शहर")}</th><th>${copy(state, "Alert volume", "अलर्ट संख्या")}</th><th>${copy(state, "Response", "प्रतिक्रिया")}</th></tr></thead>
+            <thead><tr><th>${copy(state, "City", "शहर")}</th><th>${copy(state, "Senior volume", "वरिष्ठ संख्या")}</th><th>${copy(state, "Data status", "डेटा स्थिति")}</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </section>
         <section class="panel operations-outcomes-card">
           <div class="analytics-heading"><div><p class="eyebrow">${copy(state, "Follow-up outcome", "फ़ॉलो-अप परिणाम")}</p><h2>${copy(state, "After an alert", "अलर्ट के बाद")}</h2></div></div>
-          <div class="outcome-summary"><div class="outcome-ring"><b>72%</b><span>${copy(state, "resolved", "समाधान")}</span></div><div><b>${copy(state, "Positive outcomes", "सकारात्मक परिणाम")}</b><span>${copy(state, "Call or clinical follow-up", "कॉल या क्लिनिकल फ़ॉलो-अप")}</span></div></div>
+          <div class="outcome-summary"><div class="outcome-ring"><b>${resolvedPct}%</b><span>${copy(state, "resolved", "समाधान")}</span></div><div><b>${copy(state, "Follow-up progress", "फ़ॉलो-अप प्रगति")}</b><span>${copy(state, `${completedFollowups} completed · ${pendingFollowups} pending`, `${completedFollowups} पूरा · ${pendingFollowups} लंबित`)}</span></div></div>
           <div class="outcome-list">${outcomeRows}</div>
         </section>
       </div>
