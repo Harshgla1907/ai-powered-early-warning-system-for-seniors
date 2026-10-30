@@ -3,7 +3,8 @@ const Database = require("better-sqlite3");
 const path = require("path");
 
 const app = express();
-const db = new Database(path.join(__dirname, "samarth.db"));
+const dbPath = process.env.DATABASE_PATH || path.join(__dirname, "samarth.db");
+const db = new Database(dbPath);
 const port = process.env.PORT || 4173;
 db.pragma("foreign_keys = ON");
 
@@ -11,6 +12,8 @@ app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Permissions-Policy", "camera=(self), microphone=(self), geolocation=()");
+  res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
   res.setHeader("Cache-Control", "no-store");
   next();
 });
@@ -297,6 +300,9 @@ userInsert.run("coordinator", "samarth123", "coordinator");
 userInsert.run("admin", "samarth123", "admin");
 userInsert.run("senior", "samarth123", "senior");
 userInsert.run("family", "samarth123", "family");
+for (const senior of db.prepare("SELECT id FROM seniors").all()) {
+  userInsert.run(`senior${senior.id}`, "samarth123", "senior");
+}
 
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -311,8 +317,37 @@ function requireRole(...roles) {
 }
 
 app.post("/api/auth/login", (req, res) => {
-  const { username, password } = req.body;
+  const { username, name, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "Username and password required" });
+  const seniorMatch = /^senior([1-9]|1[0-9]|20)$/.exec(String(username));
+  if (seniorMatch && String(password).trim()) {
+    if (!String(name || "").trim()) {
+      return res.status(400).json({ error: "Senior name is required" });
+    }
+    const seniorId = Number(seniorMatch[1]);
+    let senior = db.prepare("SELECT id, name FROM seniors WHERE id = ?").get(seniorId);
+    if (senior && senior.name.toLocaleLowerCase() !== String(name).trim().toLocaleLowerCase()) {
+      return res.status(401).json({ error: "Senior ID and name do not match" });
+    }
+    if (!senior) {
+      const seniorName = String(name).trim();
+      db.prepare(`INSERT INTO seniors
+        (id, name, age, city, lang, score, reasons, action, vitals, off_signals, note, last_checkin, trend)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+          seniorId, seniorName, 70, "Samarth Service Area", "Hindi", 10,
+          JSON.stringify(["No current concern detected"]), "Continue routine check-ins.",
+          JSON.stringify({ bp: "120/80", spo2: "98%", sugar: "100", weight: "60 kg" }),
+          JSON.stringify([]), "Ready for today's check-in.", "Not checked in yet",
+          JSON.stringify([10, 10, 10, 10, 10, 10, 10])
+        );
+      senior = db.prepare("SELECT id, name FROM seniors WHERE id = ?").get(seniorId);
+    }
+    const user = { id: seniorId, username: `senior${seniorId}`, role: "senior", name: senior.name };
+    const token = crypto.randomBytes(24).toString("hex");
+    sessions.set(token, user);
+    audit(user.username, "login", "session", null, { role: user.role });
+    return res.json({ token, user });
+  }
   const user = db.prepare("SELECT id, username, role FROM users WHERE username = ? AND password = ?").get(username, password);
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
   const token = crypto.randomBytes(24).toString("hex");
@@ -823,6 +858,18 @@ app.use((error, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
-app.listen(port, () => {
-  console.log(`Samarth Early Warning running at http://localhost:${port}`);
+const server = app.listen(port, "0.0.0.0", () => {
+  console.log(`Samarth Early Warning running on port ${port}`);
 });
+
+function shutdown(signal) {
+  console.log(`${signal} received. Closing gracefully.`);
+  server.close(() => {
+    db.close();
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));

@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: samarth-early-warning
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATABASE_PATH
+        value: /var/data/samarth.db
+    disk:
+      name: samarth-data
+      mountPath: /var/data
+      sizeGB: 1

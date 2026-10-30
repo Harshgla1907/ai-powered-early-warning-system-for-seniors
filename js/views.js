@@ -102,6 +102,25 @@ function detailView(s, state) {
 
 function seniorView(state) {
   const lang = state.lang;
+  if (!state.seniorAuthenticated) {
+    return `
+      <div class="senior-login">
+        <section class="panel senior-login-card">
+          <div class="senior-login-icon" aria-hidden="true">S</div>
+          <p class="eyebrow">${copy(state, "Senior citizen portal", "वरिष्ठ नागरिक पोर्टल")}</p>
+          <h1>${copy(state, "Welcome to Samarth", "समर्थ में आपका स्वागत है")}</h1>
+          <p class="sub">${copy(state, "Enter your Senior ID and password to begin today's check-in.", "आज का चेक-इन शुरू करने के लिए Senior ID और पासवर्ड डालें।")}</p>
+          <label for="seniorLoginId">${copy(state, "Senior ID", "सीनियर ID")}</label>
+          <input id="seniorLoginId" type="number" min="1" max="20" inputmode="numeric" placeholder="${copy(state, "Example: 1", "उदाहरण: 1")}">
+          <label for="seniorLoginName">${copy(state, "Name / Username", "नाम / यूज़रनेम")}</label>
+          <input id="seniorLoginName" type="text" autocomplete="name" placeholder="${copy(state, "Enter your full name", "अपना पूरा नाम डालें")}">
+          <label for="seniorLoginPassword">${copy(state, "Password", "पासवर्ड")}</label>
+          <input id="seniorLoginPassword" type="password" placeholder="${copy(state, "Enter password", "पासवर्ड डालें")}">
+          <button type="button" class="btn primary senior-login-button" data-senior-login="1">${copy(state, "Enter senior portal", "सीनियर पोर्टल में प्रवेश करें")}</button>
+          <p class="hint">${copy(state, "Use any password; it will be saved on this device.", "कोई भी पासवर्ड डालें; यह इस device पर सुरक्षित रहेगा।")}</p>
+        </section>
+      </div>`;
+  }
   const q = QUESTIONS[state.step];
   if (!q) {
     return `<div class="senior-wrap"><div class="phone">
@@ -130,6 +149,7 @@ function seniorView(state) {
       ${answers}
       <button class="big mic" data-voice="1">${copy(state, "Tell us by voice", "आवाज़ से बताएं")}</button>
       <button class="big speak-button" data-speak="1">${copy(state, "Hear this question", "यह सवाल सुनें")}</button>
+      <button class="big" data-senior-logout="1">${copy(state, "Logout", "लॉगआउट")}</button>
       <p class="hint">${hint}</p>
     </div></div>`;
 }

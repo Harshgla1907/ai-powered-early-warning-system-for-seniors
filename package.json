@@ -17,6 +17,9 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "bugs": {
     "url": "https://github.com/Harshgla1907/ai-powered-early-warning-system-for-seniors/issues"
   },

@@ -64,3 +64,20 @@ All data is synthetic. This UI flags risk and routes to a human; it does not dia
 
     npm test
     npm run test:integration
+
+## Deploy
+
+The project is ready for Render, Railway, Docker, or any Node.js 20 host.
+
+### Render
+
+1. Push this repository to GitHub.
+2. Create a new Blueprint from `render.yaml`.
+3. Render will install dependencies, start the Node.js server, run the health check, and attach persistent SQLite storage.
+
+### Docker
+
+    docker build -t samarth-early-warning .
+    docker run --rm -p 4173:4173 -e DATABASE_PATH=/app/data/samarth.db -v samarth-data:/app/data samarth-early-warning
+
+For production, use a persistent disk or volume for `DATABASE_PATH`. SQLite data is not preserved if the host replaces ephemeral storage.
