@@ -25,6 +25,9 @@ const state = {
   checkinReward: null,
   checkinAnswers: [],
   voiceStatus: "",
+  familyAuthenticated: false,
+  familyAccessId: null,
+  familyToken: "",
   voiceRecognition: null,
   voiceChat: {
     active: false,
@@ -58,32 +61,15 @@ function render() {
     operations: () => operationsView(state)
   };
   const content = (screens[route] || screens.coordinator)();
-  const careRoutes = ["coordinator", "senior", "member"];
   let portalChrome = "";
-  if (careRoutes.includes(route)) {
-    const activeIndex = careRoutes.indexOf(route);
-    const titles = state.lang === "hi"
-      ? ["देखभाल समन्वयक", "सीनियर चेक-इन", "मेरा स्वास्थ्य"]
-      : ["Care Coordinator", "Senior check-in", "My health"];
-    portalChrome = `
-      <section class="portal-journey" aria-label="${state.lang === "hi" ? "स्वास्थ्य देखभाल प्रवाह" : "Care journey"}">
-        <div class="portal-flow-label">${state.lang === "hi" ? "मुख्य देखभाल पोर्टल" : "Main care portal"}</div>
-        <div class="portal-steps">
-          ${careRoutes.map((item, index) => `<a href="#${item}" class="portal-step ${index === activeIndex ? "active" : ""} ${index < activeIndex ? "done" : ""}"><span>${index + 1}</span><b>${titles[index]}</b></a>`).join("")}
-        </div>
-        <div class="portal-navigation">
-          ${activeIndex > 0 ? `<a class="btn secondary" href="#${careRoutes[activeIndex - 1]}">← ${state.lang === "hi" ? "पीछे" : "Previous"}</a>` : "<span></span>"}
-          ${activeIndex < careRoutes.length - 1 ? `<a class="btn primary" href="#${careRoutes[activeIndex + 1]}">${state.lang === "hi" ? "आगे" : "Continue"} →</a>` : '<span class="portal-complete">✓ ' + (state.lang === "hi" ? "देखभाल प्रवाह पूरा" : "Care flow complete") + '</span>'}
-        </div>
-      </section>`;
-  } else {
-    const isFamily = route === "family";
-    portalChrome = `
-      <section class="standalone-portal">
-        <span>${state.lang === "hi" ? "अलग पोर्टल" : "Independent portal"}</span>
-        <b>${isFamily ? (state.lang === "hi" ? "परिवार पोर्टल" : "Family portal") : (state.lang === "hi" ? "ऑपरेशन पोर्टल" : "Operations portal")}</b>
-      </section>`;
-  }
+  const portalLabels = {
+    coordinator: state.lang === "hi" ? "केयर कोऑर्डिनेटर पोर्टल" : "Care Coordinator Portal",
+    senior: state.lang === "hi" ? "सीनियर चेक-इन पोर्टल" : "Senior Check-in Portal",
+    member: state.lang === "hi" ? "माई हेल्थ पोर्टल" : "My Health Portal",
+    family: state.lang === "hi" ? "पारिवारिक पोर्टल" : "Family Portal",
+    operations: state.lang === "hi" ? "ऑपरेशन पोर्टल" : "Operations Portal"
+  };
+  portalChrome = `<section class="standalone-portal"><span>${state.lang === "hi" ? "अलग पोर्टल" : "Independent portal"}</span><b>${portalLabels[route] || portalLabels.coordinator}</b></section>`;
   view.innerHTML = portalChrome + content;
   document.querySelectorAll("#nav a").forEach(a => {
     a.classList.toggle("active", a.getAttribute("href") === "#" + route);
@@ -376,6 +362,23 @@ view.addEventListener("click", e => {
   if (d.memberSubmit) {
     submitMemberUpdate(state);
   }
+  if (d.memberHealth) {
+    location.hash = "member";
+  }
+  if (d.familyLogin) {
+    loginFamilyPortal();
+  }
+  if (d.familyLogout) {
+    const token = state.familyToken;
+    state.familyAuthenticated = false;
+    state.familyToken = "";
+    state.familyAccessId = null;
+    fetch("/api/auth/logout", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` }
+    }).catch(() => {});
+    render();
+  }
   if (d.redeemRewards) {
     redeemRewardPoints(state.memberSenior || 1);
   }
@@ -539,6 +542,37 @@ async function redeemRewardPoints(seniorId) {
   } catch (error) {
     apiRetryAction = () => redeemRewardPoints(seniorId);
     setApiStatus("error", error.message || "Reward redemption failed.", true);
+  }
+}
+
+async function loginFamilyPortal() {
+  const idInput = document.getElementById("familySeniorId");
+  const passwordInput = document.getElementById("familyPassword");
+  const seniorId = Number(idInput?.value);
+  const password = passwordInput?.value?.trim();
+  const seniorExists = SENIORS.some(senior => senior.id === seniorId);
+  if (!seniorExists || !password) {
+    setApiStatus("error", state.lang === "hi" ? "वैध वरिष्ठ ID और पासवर्ड डालें।" : "Enter a valid senior ID and password.");
+    return;
+  }
+  setApiStatus("loading", "Verifying family access...");
+  try {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "family", password })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || "Invalid family credentials");
+    state.familyAuthenticated = true;
+    state.familyToken = body.token;
+    state.familyAccessId = seniorId;
+    state.familySenior = seniorId;
+    setApiStatus("success", state.lang === "hi" ? "पारिवारिक पहुँच सफल।" : "Family access confirmed.");
+    render();
+  } catch (error) {
+    apiRetryAction = loginFamilyPortal;
+    setApiStatus("error", error.message || "Family login failed.", true);
   }
 }
 

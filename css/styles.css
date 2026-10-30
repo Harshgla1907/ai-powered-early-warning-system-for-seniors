@@ -236,6 +236,44 @@ nav a.active {
   font-size: 13px;
 }
 
+.family-login {
+  display: grid;
+  min-height: 440px;
+  place-items: center;
+}
+
+.family-login-card {
+  width: min(460px, 100%);
+}
+
+.family-login-card input,
+.family-login-card label {
+  display: block;
+  width: 100%;
+}
+
+.family-login-card label {
+  margin-top: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.family-login-card input {
+  margin-top: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 11px 12px;
+}
+
+.family-login-button {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.family-logout {
+  float: right;
+}
+
 @media (max-width: 980px) {
   .topbar {
     align-items: flex-start;

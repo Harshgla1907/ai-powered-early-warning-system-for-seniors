@@ -110,7 +110,7 @@ function seniorView(state) {
       <p class="q">${copy(state, "Your answers have been saved. Your care coordinator will get in touch if a follow-up is needed.", "आपके जवाब सुरक्षित हो गए हैं। फ़ॉलो-अप की ज़रूरत हो तो देखभाल समन्वयक आपसे संपर्क करेंगे।")}</p>
       ${state.checkinReward?.points ? `<div class="member-success"><b>${copy(state, `You earned ${state.checkinReward.points} reward points!`, `आपको ${state.checkinReward.points} रिवॉर्ड पॉइंट मिले!`)}</b><span>${copy(state, "Positive daily health answers help build your Samarth balance.", "सकारात्मक दैनिक स्वास्थ्य जवाब आपके समर्थ बैलेंस को बढ़ाते हैं।")}</span></div>` : ""}
       <p class="consent-note">${copy(state, "Your answers will not be shared with your family without your consent.", "आपकी सहमति के बिना आपके जवाब परिवार के साथ साझा नहीं किए जाएंगे।")}</p>
-      <button class="big" data-restart="1">${copy(state, "Start again", "फिर से शुरू करें")}</button>
+      <button class="big" data-member-health="1">${copy(state, "Open My Health", "मेरा स्वास्थ्य खोलें")}</button>
     </div></div>`;
   }
   const answers = ANSWERS[lang]
@@ -298,6 +298,22 @@ function memberView(state) {
 }
 
 function familyView(state) {
+  if (!state.familyAuthenticated) {
+    return `
+      <div class="family-login">
+        <section class="panel family-login-card">
+          <p class="eyebrow">${copy(state, "Family access", "पारिवारिक पहुँच")}</p>
+          <h1>${copy(state, "Open the family portal", "पारिवारिक पोर्टल खोलें")}</h1>
+          <p class="sub">${copy(state, "Enter the senior citizen ID and family password to view approved health information.", "अनुमोदित स्वास्थ्य जानकारी देखने के लिए वरिष्ठ नागरिक ID और परिवार पासवर्ड डालें।")}</p>
+          <label for="familySeniorId">${copy(state, "Senior citizen ID", "वरिष्ठ नागरिक ID")}</label>
+          <input id="familySeniorId" type="number" min="1" max="14" placeholder="1">
+          <label for="familyPassword">${copy(state, "Family password", "परिवार पासवर्ड")}</label>
+          <input id="familyPassword" type="password" placeholder="${copy(state, "Enter password", "पासवर्ड डालें")}">
+          <button type="button" class="btn primary family-login-button" data-family-login="1">${copy(state, "Access family information", "पारिवारिक जानकारी देखें")}</button>
+          <p class="hint">${copy(state, "Demo password: samarth123", "डेमो पासवर्ड: samarth123")}</p>
+        </section>
+      </div>`;
+  }
   const s = SENIORS.find(x => x.id === state.familySenior);
   const first = s.name.split(" ")[0];
   const days = ["M", "T", "W", "T", "F", "S", "S"];
@@ -310,6 +326,7 @@ function familyView(state) {
       <h1>${copy(state, `How ${first} is doing this week`, `${first} इस सप्ताह कैसा है`)}</h1>
       <p class="sub">${copy(state, "A simple weekly update for the family. The care coordinator decides when the family needs to be contacted.", "परिवार के लिए आसान साप्ताहिक अपडेट। परिवार को कब संपर्क करना है, यह देखभाल समन्वयक तय करते हैं।")}</p>
       <div class="picker"><span>${copy(state, "View for", "इनके लिए देखें")}</span><select id="familyPick">${opts}</select></div>
+      <button type="button" class="btn secondary family-logout" data-family-logout="1">${copy(state, "Log out", "लॉग आउट")}</button>
       ${s.score >= 80 ? `<div class="urgent"><b>${copy(state, `Please call ${first} today.`, `आज ${first} को कॉल करें।`)}</b><br>${copy(state, "Recent changes need a quick check.", "हाल के बदलावों की जल्दी जाँच ज़रूरी है।")}</div>` : ""}
       <div class="panel letter">
         <div class="letter-status ${calm ? "calm" : "attention"}"><span></span><b>${calm ? copy(state, "Normal week", "सामान्य सप्ताह") : copy(state, "Recent change", "हाल का बदलाव")}</b></div>
