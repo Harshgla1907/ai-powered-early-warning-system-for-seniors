@@ -561,6 +561,31 @@ app.get("/api/audit-log", (req, res) => {
   })));
 });
 
+app.patch("/api/seniors/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: "Invalid senior id" });
+  if (!seniorExists(id)) return res.status(404).json({ error: "Senior not found" });
+  if (!req.body || !Object.keys(req.body).length) return res.status(400).json({ error: "At least one update field is required" });
+  if (req.body.feedback !== undefined && !["useful", "notuseful"].includes(req.body.feedback)) {
+    return res.status(400).json({ error: "Invalid feedback value" });
+  }
+  if (req.body.done !== undefined && typeof req.body.done !== "boolean") {
+    return res.status(400).json({ error: "done must be boolean" });
+  }
+  if (req.body.feedback !== undefined) db.prepare("UPDATE seniors SET feedback = ? WHERE id = ?").run(req.body.feedback, id);
+  if (req.body.done !== undefined) {
+    db.prepare("UPDATE seniors SET followup_done = ? WHERE id = ?").run(req.body.done ? 1 : 0, id);
+    if (req.body.done) {
+      db.prepare(`
+        INSERT INTO followups (senior_id, action, status, created_at, completed_at)
+        VALUES (?, 'Care coordinator marked follow-up complete', 'completed', datetime('now'), datetime('now'))
+      `).run(id);
+    }
+  }
+  audit("coordinator", "update", "senior", id, req.body);
+  res.json(toSenior(db.prepare("SELECT * FROM seniors WHERE id = ?").get(id)));
+});
+
 app.use("/api", (req, res) => {
   res.status(404).json({ error: "API endpoint not found" });
 });
@@ -574,24 +599,6 @@ app.use((error, req, res, next) => {
   }
   console.error(error);
   res.status(500).json({ error: "Internal server error" });
-});
-
-app.patch("/api/seniors/:id", (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid senior id" });
-  if (req.body.feedback) db.prepare("UPDATE seniors SET feedback = ? WHERE id = ?").run(req.body.feedback, id);
-  if (req.body.done !== undefined) {
-    db.prepare("UPDATE seniors SET followup_done = ? WHERE id = ?").run(req.body.done ? 1 : 0, id);
-    if (req.body.done && db.prepare("SELECT 1 FROM seniors WHERE id = ?").get(id)) {
-      db.prepare(`
-        INSERT INTO followups (senior_id, action, status, created_at, completed_at)
-        VALUES (?, 'Care coordinator marked follow-up complete', 'completed', datetime('now'), datetime('now'))
-      `).run(id);
-    }
-  }
-  const row = db.prepare("SELECT * FROM seniors WHERE id = ?").get(id);
-  if (!row) return res.status(404).json({ error: "Senior not found" });
-  res.json(toSenior(row));
 });
 
 app.listen(port, () => {

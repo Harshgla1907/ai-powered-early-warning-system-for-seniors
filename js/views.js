@@ -290,10 +290,18 @@ function familyView(state) {
 }
 
 function operationsView(state) {
-  const total = CITY_ALERTS.reduce((n, c) => n + c.alerts, 0);
-  const avg = (CITY_ALERTS.reduce((n, c) => n + c.avgResponse, 0) / CITY_ALERTS.length).toFixed(1);
-  const maxAlerts = Math.max(...CITY_ALERTS.map(c => c.alerts));
-  const rows = CITY_ALERTS
+  const live = state.operations;
+  const liveCities = live?.cities?.map(c => ({ city: c.city, alerts: c.alerts, avgResponse: 3 })) || null;
+  const cityData = liveCities || CITY_ALERTS;
+  const total = cityData.reduce((n, c) => n + c.alerts, 0);
+  const avg = (cityData.reduce((n, c) => n + c.avgResponse, 0) / cityData.length).toFixed(1);
+  const maxAlerts = Math.max(...cityData.map(c => c.alerts), 1);
+  const feedbackRows = live?.feedback || [];
+  const usefulCount = feedbackRows.find(f => f.useful === 1)?.count || 0;
+  const feedbackTotal = feedbackRows.reduce((sum, f) => sum + f.count, 0);
+  const usefulPct = feedbackTotal ? Math.round((usefulCount / feedbackTotal) * 100) : 71;
+  const pendingFollowups = live?.pendingFollowups ?? 12;
+  const rows = cityData
     .map((c, index) => `
       <tr>
         <td><span class="city-rank">${index + 1}</span><b>${c.city}</b></td>
@@ -326,8 +334,8 @@ function operationsView(state) {
       <div class="kpis operations-kpis">
         <div class="panel kpi accent-teal"><span class="kpi-icon">↗</span><b>${total}</b><span>${copy(state, "Priority alerts raised", "प्राथमिकता अलर्ट")}</span><small>${copy(state, "Across 6 active cities", "6 सक्रिय शहरों में")}</small></div>
         <div class="panel kpi accent-blue"><span class="kpi-icon">◷</span><b>${avg} ${copy(state, "hrs", "घंटे")}</b><span>${copy(state, "Average response time", "औसत प्रतिक्रिया समय")}</span><small>${copy(state, "0.6 hrs faster this month", "इस महीने 0.6 घंटे तेज़")}</small></div>
-        <div class="panel kpi accent-green"><span class="kpi-icon">✓</span><b>71%</b><span>${copy(state, "Alerts useful to the team", "टीम के लिए उपयोगी अलर्ट")}</span><small>${copy(state, "Up 8% from last month", "पिछले महीने से 8% अधिक")}</small></div>
-        <div class="panel kpi accent-purple"><span class="kpi-icon">◎</span><b>12</b><span>${copy(state, "Decoy seniors tested", "टेस्ट किए गए वरिष्ठ")}</span><small>${copy(state, "No false emergency calls", "कोई गलत इमरजेंसी कॉल नहीं")}</small></div>
+        <div class="panel kpi accent-green"><span class="kpi-icon">✓</span><b>${usefulPct}%</b><span>${copy(state, "Alerts useful to the team", "टीम के लिए उपयोगी अलर्ट")}</span><small>${copy(state, "Based on live feedback", "लाइव प्रतिक्रिया पर आधारित")}</small></div>
+        <div class="panel kpi accent-purple"><span class="kpi-icon">◎</span><b>${pendingFollowups}</b><span>${copy(state, "Pending follow-ups", "लंबित फ़ॉलो-अप")}</span><small>${copy(state, "From the live database", "लाइव डेटाबेस से")}</small></div>
       </div>
       <section class="guardrails operations-guardrails">
         <div><span class="guardrail-icon">1</span><p><b>${copy(state, "Personal baseline", "व्यक्तिगत आधार रेखा")}</b><small>${copy(state, "Uses each senior's usual pattern", "हर वरिष्ठ की सामान्य स्थिति की तुलना करता है")}</small></p></div>

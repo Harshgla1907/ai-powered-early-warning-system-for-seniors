@@ -15,6 +15,7 @@ const state = {
   memberSubmitted: false,
   memberAnalysis: null,
   memberVitals: { systolic: "", diastolic: "", pulse: "", spo2: "", glucose: "" },
+  operations: null,
   checkinAnswers: [],
   voiceStatus: "",
   voiceRecognition: null,
@@ -26,6 +27,7 @@ const state = {
   }
 };
 
+let apiRetryAction = null;
 const view = document.getElementById("view");
 const apiStatus = document.getElementById("apiStatus");
 
@@ -214,8 +216,7 @@ function listenForVoiceChatAnswer() {
     if (state.voiceChat.step >= prompts.length) {
       state.voiceChat.active = false;
       state.voiceStatus = "";
-      state.memberSubmitted = true;
-      submitMemberUpdate(state);
+        submitMemberUpdate(state);
       return;
     }
     render();
@@ -340,7 +341,6 @@ view.addEventListener("click", e => {
     state.memberSubmitted = false;
   }
   if (d.memberSubmit) {
-    state.memberSubmitted = true;
     submitMemberUpdate(state);
   }
   if (d.memberVoice) {
@@ -408,6 +408,17 @@ async function loadSeniorsFromApi() {
   render();
 }
 
+async function loadOperationsFromApi() {
+  try {
+    const response = await fetch("/api/operations");
+    if (!response.ok) throw new Error("Could not load operations");
+    state.operations = await response.json();
+    render();
+  } catch {
+    // Keep demo values visible until live operations data becomes available.
+  }
+}
+
 async function updateSeniorInApi(id, patch) {
   setApiStatus("loading", "Saving changes...");
   try {
@@ -418,7 +429,9 @@ async function updateSeniorInApi(id, patch) {
     });
     if (!response.ok) throw new Error("Could not save senior update");
     setApiStatus("success", "Changes saved.");
+    await loadSeniorsFromApi();
   } catch {
+    apiRetryAction = () => updateSeniorInApi(id, patch);
     setApiStatus("error", "Changes could not be saved. Please retry.", true);
   }
 }
@@ -446,6 +459,7 @@ async function submitCheckin(answers, voiceUsed) {
 async function submitMemberUpdate(currentState) {
   setApiStatus("loading", "Sharing the health update...");
   try {
+    currentState.memberSubmitted = false;
     const response = await fetch("/api/member-updates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -466,15 +480,19 @@ async function submitMemberUpdate(currentState) {
       if (value !== "" && Number.isFinite(Number(value))) vitals[key] = Number(value);
     }
     if (Object.keys(vitals).length) {
-      await fetch("/api/vitals", {
+      const vitalsResponse = await fetch("/api/vitals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ seniorId: 1, ...vitals, source: "member_voice_or_manual" })
       });
+      if (!vitalsResponse.ok) throw new Error("Vitals could not be saved");
     }
+    currentState.memberSubmitted = true;
     setApiStatus("success", "Health update shared with the care team.");
     render();
   } catch {
+    currentState.memberSubmitted = false;
+    apiRetryAction = () => submitMemberUpdate(currentState);
     setApiStatus("error", "Health update was not shared. Please retry.", true);
   }
 }
@@ -483,7 +501,10 @@ document.addEventListener("click", e => {
   const button = e.target.closest("button[data-done], button[data-fb]");
   if (!button) {
     const retry = e.target.closest("button[data-api-retry]");
-    if (retry) loadSeniorsFromApi();
+    if (retry) {
+      if (apiRetryAction) apiRetryAction();
+      else loadSeniorsFromApi();
+    }
     return;
   }
   if (button.dataset.done) updateSeniorInApi(Number(button.dataset.done), { done: true });
@@ -496,9 +517,14 @@ document.addEventListener("click", e => {
     }).then(response => {
       if (!response.ok) throw new Error("Feedback failed");
       setApiStatus("success", "Feedback saved.");
-    }).catch(() => setApiStatus("error", "Feedback could not be saved.", true));
+      loadOperationsFromApi();
+    }).catch(() => {
+      apiRetryAction = () => updateSeniorInApi(Number(button.dataset.sid), { feedback: button.dataset.fb });
+      setApiStatus("error", "Feedback could not be saved.", true);
+    });
   }
 });
 
 loadSeniorsFromApi();
+loadOperationsFromApi();
 window.scrollTo({ top: 0, behavior: "smooth" });
