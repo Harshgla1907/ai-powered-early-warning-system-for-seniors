@@ -57,7 +57,34 @@ function render() {
     family: () => familyView(state),
     operations: () => operationsView(state)
   };
-  view.innerHTML = (screens[route] || screens.coordinator)();
+  const content = (screens[route] || screens.coordinator)();
+  const careRoutes = ["coordinator", "senior", "member"];
+  let portalChrome = "";
+  if (careRoutes.includes(route)) {
+    const activeIndex = careRoutes.indexOf(route);
+    const titles = state.lang === "hi"
+      ? ["देखभाल समन्वयक", "सीनियर चेक-इन", "मेरा स्वास्थ्य"]
+      : ["Care Coordinator", "Senior check-in", "My health"];
+    portalChrome = `
+      <section class="portal-journey" aria-label="${state.lang === "hi" ? "स्वास्थ्य देखभाल प्रवाह" : "Care journey"}">
+        <div class="portal-flow-label">${state.lang === "hi" ? "मुख्य देखभाल पोर्टल" : "Main care portal"}</div>
+        <div class="portal-steps">
+          ${careRoutes.map((item, index) => `<a href="#${item}" class="portal-step ${index === activeIndex ? "active" : ""} ${index < activeIndex ? "done" : ""}"><span>${index + 1}</span><b>${titles[index]}</b></a>`).join("")}
+        </div>
+        <div class="portal-navigation">
+          ${activeIndex > 0 ? `<a class="btn secondary" href="#${careRoutes[activeIndex - 1]}">← ${state.lang === "hi" ? "पीछे" : "Previous"}</a>` : "<span></span>"}
+          ${activeIndex < careRoutes.length - 1 ? `<a class="btn primary" href="#${careRoutes[activeIndex + 1]}">${state.lang === "hi" ? "आगे" : "Continue"} →</a>` : '<span class="portal-complete">✓ ' + (state.lang === "hi" ? "देखभाल प्रवाह पूरा" : "Care flow complete") + '</span>'}
+        </div>
+      </section>`;
+  } else {
+    const isFamily = route === "family";
+    portalChrome = `
+      <section class="standalone-portal">
+        <span>${state.lang === "hi" ? "अलग पोर्टल" : "Independent portal"}</span>
+        <b>${isFamily ? (state.lang === "hi" ? "परिवार पोर्टल" : "Family portal") : (state.lang === "hi" ? "ऑपरेशन पोर्टल" : "Operations portal")}</b>
+      </section>`;
+  }
+  view.innerHTML = portalChrome + content;
   document.querySelectorAll("#nav a").forEach(a => {
     a.classList.toggle("active", a.getAttribute("href") === "#" + route);
   });
@@ -67,6 +94,7 @@ function render() {
   });
   document.querySelectorAll("[data-nav]").forEach(link => {
     const key = link.dataset.nav;
+    if (!key || key === "brand") return;
     const labels = state.lang === "hi"
       ? { coordinator: "देखभाल समन्वयक", senior: "सीनियर चेक-इन", member: "मेरा स्वास्थ्य", family: "परिवार", operations: "ऑपरेशन" }
       : { coordinator: "Care Coordinator", senior: "Senior check-in", member: "My health", family: "Family", operations: "Operations" };

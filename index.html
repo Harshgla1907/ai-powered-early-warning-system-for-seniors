@@ -10,13 +10,18 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">Samarth <span>Early Warning</span></div>
+    <a class="brand" href="#coordinator" data-nav="brand" aria-label="Samarth portals">Samarth <span>Early Warning</span></a>
     <nav id="nav">
-      <a href="#coordinator" data-nav="coordinator">Care Coordinator</a>
-      <a href="#senior" data-nav="senior">Senior check-in</a>
-      <a href="#member" data-nav="member">My health</a>
-      <a href="#family" data-nav="family">Family</a>
-      <a href="#operations" data-nav="operations">Operations</a>
+      <span class="nav-group">
+        <a href="#coordinator" data-nav="coordinator">Care Coordinator</a>
+        <a href="#senior" data-nav="senior">Senior check-in</a>
+        <a href="#member" data-nav="member">My health</a>
+      </span>
+      <span class="nav-divider" aria-hidden="true"></span>
+      <span class="nav-group nav-independent">
+        <a href="#family" data-nav="family">Family</a>
+        <a href="#operations" data-nav="operations">Operations</a>
+      </span>
     </nav>
     <div class="language-switch" aria-label="Choose language">
       <button type="button" data-lang="en" class="active">EN</button>
