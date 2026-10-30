@@ -7,9 +7,6 @@ const db = new Database(path.join(__dirname, "samarth.db"));
 const port = process.env.PORT || 4173;
 db.pragma("foreign_keys = ON");
 
-app.use(express.json({ limit: "100kb" }));
-app.use(express.static(__dirname));
-
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -17,6 +14,13 @@ app.use((req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   next();
 });
+app.use(express.json({ limit: "100kb" }));
+app.use(express.static(__dirname, {
+  etag: false,
+  lastModified: false,
+  maxAge: 0,
+  setHeaders: (res) => res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
+}));
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS seniors (
