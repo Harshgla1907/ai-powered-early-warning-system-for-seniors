@@ -1,0 +1,71 @@
+CREATE DATABASE IF NOT EXISTS samarth CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE samarth;
+
+CREATE TABLE IF NOT EXISTS seniors (
+  id BIGINT UNSIGNED PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  age TINYINT UNSIGNED NOT NULL,
+  city VARCHAR(100) NOT NULL,
+  lang VARCHAR(20) NOT NULL,
+  score SMALLINT UNSIGNED NOT NULL,
+  reasons JSON NOT NULL,
+  action TEXT NOT NULL,
+  vitals JSON NOT NULL,
+  off_signals JSON NOT NULL,
+  note TEXT NOT NULL,
+  last_checkin VARCHAR(100) NOT NULL,
+  trend JSON NOT NULL,
+  feedback VARCHAR(20),
+  followup_done BOOLEAN NOT NULL DEFAULT FALSE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS users (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(40) NOT NULL UNIQUE,
+  password VARCHAR(255) NOT NULL,
+  role VARCHAR(20) NOT NULL,
+  senior_id BIGINT UNSIGNED,
+  CONSTRAINT fk_users_senior FOREIGN KEY (senior_id) REFERENCES seniors(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS checkins (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  senior_id BIGINT UNSIGNED NOT NULL,
+  language VARCHAR(10) NOT NULL,
+  answers JSON NOT NULL,
+  voice_used BOOLEAN NOT NULL DEFAULT FALSE,
+  positive_answers SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  reward_points SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_checkins_senior (senior_id, id DESC),
+  CONSTRAINT fk_checkins_senior FOREIGN KEY (senior_id) REFERENCES seniors(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS member_updates (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  senior_id BIGINT UNSIGNED NOT NULL,
+  concerns JSON NOT NULL,
+  literacy VARCHAR(40),
+  notes TEXT,
+  language VARCHAR(10),
+  consent BOOLEAN NOT NULL DEFAULT TRUE,
+  nlp_analysis JSON,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_member_updates_senior (senior_id, id DESC),
+  CONSTRAINT fk_updates_senior FOREIGN KEY (senior_id) REFERENCES seniors(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS vitals (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  senior_id BIGINT UNSIGNED NOT NULL,
+  systolic SMALLINT,
+  diastolic SMALLINT,
+  pulse SMALLINT,
+  spo2 SMALLINT,
+  temperature DECIMAL(4,1),
+  glucose SMALLINT,
+  source VARCHAR(40) NOT NULL DEFAULT 'manual',
+  recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_vitals_senior (senior_id, recorded_at DESC),
+  CONSTRAINT fk_vitals_senior FOREIGN KEY (senior_id) REFERENCES seniors(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

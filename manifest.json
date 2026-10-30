@@ -1,0 +1,10 @@
+{
+  "name": "Samarth Early Warning",
+  "short_name": "Samarth",
+  "description": "Bilingual senior care check-in and early warning platform",
+  "start_url": "./#coordinator",
+  "display": "standalone",
+  "background_color": "#eef2f0",
+  "theme_color": "#1d2b2a",
+  "lang": "en-IN"
+}

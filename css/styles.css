@@ -14,6 +14,70 @@
   box-sizing: border-box;
 }
 
+@keyframes samarth-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes samarth-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(31, 111, 107, 0.18); }
+  50% { box-shadow: 0 0 0 8px rgba(31, 111, 107, 0); }
+}
+
+#view > .standalone-portal,
+#view > .page-intro,
+#view > .split,
+#view > .senior-wrap,
+#view > .senior-login,
+#view > .family-login,
+#view > .family-dashboard,
+#view > .operations-wrap,
+#view > .member-shell {
+  animation: samarth-enter 0.42s ease both;
+}
+
+.panel,
+.btn,
+.big,
+.row,
+.chip,
+.vital {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.panel:hover,
+.row:hover,
+.vital:hover {
+  transform: translateY(-2px);
+}
+
+.btn:active,
+.big:active,
+.row:active {
+  transform: scale(0.98);
+}
+
+.btn.primary,
+.senior-login-button,
+.family-login-button {
+  animation: samarth-pulse 2.4s ease-in-out infinite;
+}
+
+.btn[disabled],
+.big[disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 html {
   min-width: 320px;
 }

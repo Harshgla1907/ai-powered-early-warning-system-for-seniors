@@ -299,6 +299,20 @@ function analyzeHealthText(text = "", language = "en") {
 
 const crypto = require("crypto");
 const sessions = new Map();
+const loginAttempts = new Map();
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derived = crypto.scryptSync(String(password), salt, 64).toString("hex");
+  return `scrypt$${salt}$${derived}`;
+}
+function verifyPassword(password, stored) {
+  if (!String(stored || "").startsWith("scrypt$")) return String(password) === String(stored);
+  const parts = stored.split("$");
+  if (parts.length !== 3) return false;
+  const actual = crypto.scryptSync(String(password), parts[1], 64);
+  const expected = Buffer.from(parts[2], "hex");
+  return expected.length === actual.length && crypto.timingSafeEqual(actual, expected);
+}
 const userInsert = db.prepare("INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)");
 userInsert.run("coordinator", "samarth123", "coordinator");
 userInsert.run("admin", "samarth123", "admin");
@@ -308,6 +322,11 @@ for (const senior of db.prepare("SELECT id FROM seniors").all()) {
   userInsert.run(`senior${senior.id}`, "samarth123", "senior");
 }
 db.prepare("UPDATE users SET senior_id = CAST(substr(username, 7) AS INTEGER) WHERE role = 'senior' AND username LIKE 'senior%' AND senior_id IS NULL").run();
+for (const user of db.prepare("SELECT id, password FROM users").all()) {
+  if (!String(user.password).startsWith("scrypt$")) {
+    db.prepare("UPDATE users SET password = ? WHERE id = ?").run(hashPassword(user.password), user.id);
+  }
+}
 
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -346,7 +365,7 @@ app.post("/api/auth/register", (req, res) => {
       JSON.stringify([10, 10, 10, 10, 10, 10, 10])
     );
   db.prepare("INSERT INTO users (username, password, role, senior_id) VALUES (?, ?, 'senior', ?)")
-    .run(username, password, seniorId);
+    .run(username, hashPassword(password), seniorId);
   audit(username, "register", "senior", seniorId, { name });
   res.status(201).json({
     success: true,
@@ -355,18 +374,28 @@ app.post("/api/auth/register", (req, res) => {
 });
 
 app.post("/api/auth/login", (req, res) => {
-  const { username, name, password } = req.body;
+  const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "Username and password required" });
-  const seniorMatch = /^senior([1-9]|1[0-9]|20)$/.exec(String(username));
   const normalizedUsername = String(username).trim().toLocaleLowerCase();
   const user = db.prepare(
-    "SELECT id, username, role, senior_id AS seniorId FROM users WHERE lower(username) = ? AND password = ?"
-  ).get(normalizedUsername, String(password));
-  if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    "SELECT id, username, password, role, senior_id AS seniorId FROM users WHERE lower(username) = ?"
+  ).get(normalizedUsername);
+  const attempts = loginAttempts.get(normalizedUsername) || { count: 0, until: 0 };
+  if (attempts.until > Date.now()) {
+    return res.status(429).json({ error: "Too many login attempts. Please try again later." });
+  }
+  if (!user || !verifyPassword(String(password), user.password)) {
+    attempts.count += 1;
+    if (attempts.count >= 5) attempts.until = Date.now() + 60_000;
+    loginAttempts.set(normalizedUsername, attempts);
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+  loginAttempts.delete(normalizedUsername);
+  const safeUser = { id: user.id, username: user.username, role: user.role, seniorId: user.seniorId };
   const token = crypto.randomBytes(24).toString("hex");
-  sessions.set(token, user);
-  audit(user.username, "login", "session", null, { role: user.role });
-  res.json({ token, user });
+  sessions.set(token, safeUser);
+  audit(safeUser.username, "login", "session", null, { role: safeUser.role });
+  res.json({ token, user: safeUser });
 });
 
 app.post("/api/auth/logout", (req, res) => {

@@ -67,6 +67,10 @@ All data is synthetic. This UI flags risk and routes to a human; it does not dia
 
 ## Deploy
 
+## MySQL migration schema
+
+A production MySQL/InnoDB schema is provided at `sql/mysql-schema.sql`. The local prototype continues to use SQLite, which keeps setup and demonstrations fast without requiring a database server.
+
 The project is ready for Render, Railway, Docker, or any Node.js 20 host.
 
 ### Render

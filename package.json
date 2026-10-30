@@ -1,7 +1,7 @@
 {
   "name": "samarth-early-warning",
   "version": "1.0.0",
-  "description": "Frontend prototype for \"Samarth Early Warning\": an early-warning system for seniors living at home. It combines vitals, medicine records and call notes into a daily risk score compared with each senior's own baseline—not a population average. The interface is built to make the alert understandable and route it to a human; it does not diagnose. Plain HTML, CSS and JavaScript. No build step, no dependencies.",
+  "description": "Bilingual senior care platform with voice check-ins, REST APIs, SQLite persistence, risk analysis, rewards, and four role-based dashboards.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
