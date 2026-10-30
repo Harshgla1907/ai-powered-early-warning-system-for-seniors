@@ -61,6 +61,18 @@ db.exec(`
     consent INTEGER DEFAULT 1,
     created_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS vitals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    senior_id INTEGER NOT NULL,
+    systolic INTEGER,
+    diastolic INTEGER,
+    pulse INTEGER,
+    spo2 INTEGER,
+    temperature REAL,
+    glucose INTEGER,
+    source TEXT NOT NULL DEFAULT 'manual',
+    recorded_at TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS alert_feedback (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     senior_id INTEGER NOT NULL,
@@ -86,6 +98,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_followups_status ON followups(status, id DESC);
   CREATE INDEX IF NOT EXISTS idx_member_updates_senior ON member_updates(senior_id, id DESC);
   CREATE INDEX IF NOT EXISTS idx_alert_feedback_senior ON alert_feedback(senior_id, id DESC);
+  CREATE INDEX IF NOT EXISTS idx_vitals_senior ON vitals(senior_id, recorded_at DESC);
 `);
 
 const memberColumns = db.prepare("PRAGMA table_info(member_updates)").all();
@@ -447,6 +460,41 @@ app.get("/api/operations", (req, res) => {
   res.json({ cities: cityRows, feedback: feedbackRows, pendingFollowups: db.prepare("SELECT COUNT(*) AS count FROM followups WHERE status = 'pending'").get().count });
 });
 
+app.post("/api/vitals", (req, res) => {
+  const { seniorId = 1, systolic, diastolic, pulse, spo2, temperature, glucose, source = "manual" } = req.body;
+  const id = validId(seniorId);
+  if (!id || !seniorExists(id)) return res.status(404).json({ error: "Senior not found" });
+  const optionalNumbers = { systolic, diastolic, pulse, spo2, temperature, glucose };
+  for (const [key, value] of Object.entries(optionalNumbers)) {
+    if (value !== undefined && value !== null && (typeof value !== "number" || !Number.isFinite(value))) {
+      return res.status(400).json({ error: `${key} must be numeric` });
+    }
+  }
+  if (systolic !== undefined && (systolic < 70 || systolic > 260)) return res.status(400).json({ error: "systolic is outside supported range" });
+  if (diastolic !== undefined && (diastolic < 40 || diastolic > 160)) return res.status(400).json({ error: "diastolic is outside supported range" });
+  if (pulse !== undefined && (pulse < 30 || pulse > 220)) return res.status(400).json({ error: "pulse is outside supported range" });
+  if (spo2 !== undefined && (spo2 < 50 || spo2 > 100)) return res.status(400).json({ error: "spo2 is outside supported range" });
+
+  const result = db.prepare(`
+    INSERT INTO vitals (senior_id, systolic, diastolic, pulse, spo2, temperature, glucose, source, recorded_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `).run(id, systolic ?? null, diastolic ?? null, pulse ?? null, spo2 ?? null, temperature ?? null, glucose ?? null, source);
+  audit("member", "record", "vitals", result.lastInsertRowid, { seniorId: id, source });
+  res.status(201).json({ id: result.lastInsertRowid, seniorId: id, systolic, diastolic, pulse, spo2, temperature, glucose, source });
+});
+
+app.get("/api/vitals/:seniorId", (req, res) => {
+  const id = validId(req.params.seniorId);
+  if (!id || !seniorExists(id)) return res.status(404).json({ error: "Senior not found" });
+  const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
+  const rows = db.prepare("SELECT * FROM vitals WHERE senior_id = ? ORDER BY id DESC LIMIT ?").all(id, limit);
+  res.json(rows.map(row => ({
+    id: row.id, seniorId: row.senior_id, systolic: row.systolic, diastolic: row.diastolic,
+    pulse: row.pulse, spo2: row.spo2, temperature: row.temperature, glucose: row.glucose,
+    source: row.source, recordedAt: row.recorded_at
+  })));
+});
+
 app.post("/api/risk/calculate", (req, res) => {
   const { seniorId, currentTrend, changedSignals = [] } = req.body;
   if (!Array.isArray(currentTrend) || currentTrend.length < 2 || !currentTrend.every(Number.isFinite)) {
@@ -458,9 +506,25 @@ app.post("/api/risk/calculate", (req, res) => {
   const deviation = Math.sqrt(variance);
   const latest = values[values.length - 1];
   const zScore = deviation ? (latest - mean) / deviation : 0;
-  const signalScore = Math.min(changedSignals.length * 12, 36);
-  const trendScore = Math.max(0, Math.min(64, zScore * 18 + 32));
-  const score = Math.round(Math.min(100, signalScore + trendScore));
+  const sorted = [...values].sort((a, b) => a - b);
+  const median = sorted.length % 2 ? sorted[Math.floor(sorted.length / 2)]
+    : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+  const absoluteDeviations = values.map(value => Math.abs(value - median)).sort((a, b) => a - b);
+  const mad = absoluteDeviations.length % 2 ? absoluteDeviations[Math.floor(absoluteDeviations.length / 2)]
+    : (absoluteDeviations[absoluteDeviations.length / 2 - 1] + absoluteDeviations[absoluteDeviations.length / 2]) / 2;
+  const robustZ = mad ? 0.6745 * (latest - median) / mad : 0;
+  const weights = { bp: 12, medicine: 14, sleep: 9, food: 10, pain: 16, spo2: 18, sugar: 12, mobility: 8 };
+  const uniqueSignals = [...new Set(changedSignals.filter(value => typeof value === "string"))];
+  const signalScore = Math.min(uniqueSignals.reduce((sum, signal) => sum + (weights[signal] || 8), 0), 42);
+  const persistence = values.slice(-3).filter(value => value > median + Math.max(mad, 1)).length * 5;
+  const anomalyScore = Math.max(0, Math.min(30, robustZ * 7));
+  const trendScore = Math.max(0, Math.min(28, zScore * 8 + 12));
+  const score = Math.round(Math.min(100, signalScore + persistence + anomalyScore + trendScore));
+  const contributions = uniqueSignals.map(signal => ({
+    signal,
+    contribution: weights[signal] || 8,
+    reason: `${signal.replace(/_/g, " ")} changed from the personal baseline`
+  }));
   if (seniorId && !seniorExists(Number(seniorId))) {
     return res.status(404).json({ error: "Senior not found" });
   }
@@ -469,7 +533,17 @@ app.post("/api/risk/calculate", (req, res) => {
     score,
     level: score >= 70 ? "high" : score >= 45 ? "mid" : "low",
     zScore: Number(zScore.toFixed(3)),
+    robustZScore: Number(robustZ.toFixed(3)),
+    median: Number(median.toFixed(2)),
+    mad: Number(mad.toFixed(2)),
     changedSignals,
+    contributions,
+    components: {
+      signalScore,
+      persistenceScore: persistence,
+      anomalyScore: Math.round(anomalyScore),
+      trendScore: Math.round(trendScore)
+    },
     explanation: score >= 70
       ? "Several recent signals changed together; immediate human review is recommended."
       : score >= 45

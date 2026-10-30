@@ -128,6 +128,7 @@ function seniorView(state) {
       <p class="q">${q[lang]}</p>
       ${answers}
       <button class="big mic" data-voice="1">${copy(state, "Tell us by voice", "आवाज़ से बताएं")}</button>
+      <button class="big speak-button" data-speak="1">${copy(state, "Hear this question", "यह सवाल सुनें")}</button>
       <p class="hint">${hint}</p>
     </div></div>`;
 }
@@ -215,6 +216,13 @@ function memberView(state) {
         </div>
         <label for="memberOther">${copy(state, "Write in a sentence, or ask the care team to write it for you", "एक वाक्य में लिखें, या टीम से लिखवाने के लिए कहें")}</label>
         <textarea id="memberOther" rows="4" placeholder="${copy(state, "Example: My BP was 158/96 and I missed my morning tablet.", "उदाहरण: मेरा बीपी 158/96 था और मैंने सुबह की दवा मिस कर दी।")}">${state.memberOther}</textarea>
+        <div class="vitals-entry" aria-label="${copy(state, "Optional vital readings", "वैकल्पिक स्वास्थ्य रीडिंग")}">
+          <label><span>BP (systolic)</span><input type="number" min="70" max="260" inputmode="numeric" data-member-vital="systolic" value="${state.memberVitals.systolic}" placeholder="158"></label>
+          <label><span>BP (diastolic)</span><input type="number" min="40" max="160" inputmode="numeric" data-member-vital="diastolic" value="${state.memberVitals.diastolic}" placeholder="96"></label>
+          <label><span>${copy(state, "Pulse", "धड़कन")}</span><input type="number" min="30" max="220" inputmode="numeric" data-member-vital="pulse" value="${state.memberVitals.pulse}" placeholder="78"></label>
+          <label><span>SpO2 (%)</span><input type="number" min="50" max="100" inputmode="numeric" data-member-vital="spo2" value="${state.memberVitals.spo2}" placeholder="96"></label>
+          <label><span>${copy(state, "Sugar", "शुगर")}</span><input type="number" min="20" max="600" inputmode="numeric" data-member-vital="glucose" value="${state.memberVitals.glucose}" placeholder="142"></label>
+        </div>
         <div class="voice-input-row">
           <button type="button" class="btn voice" data-member-voice="1" aria-pressed="${state.voice}">
             <span class="mic-icon">${state.voice ? "●" : "◉"}</span>

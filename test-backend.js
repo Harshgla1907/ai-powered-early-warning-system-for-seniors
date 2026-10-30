@@ -76,6 +76,18 @@ async function run() {
   });
   if (risk.status !== 200 || !Number.isInteger(risk.body.score)) throw new Error("Risk API failed");
 
+  const vitals = await request("/api/vitals", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ seniorId: 1, systolic: 158, diastolic: 96, pulse: 88, spo2: 96, glucose: 142, source: "integration-test" })
+  });
+  if (vitals.status !== 201 || vitals.body.systolic !== 158) throw new Error("Vitals API failed");
+
+  const vitalsHistory = await request("/api/vitals/1");
+  if (vitalsHistory.status !== 200 || !Array.isArray(vitalsHistory.body) || !vitalsHistory.body.length) {
+    throw new Error("Vitals history API failed");
+  }
+
   const invalidRisk = await request("/api/risk/calculate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

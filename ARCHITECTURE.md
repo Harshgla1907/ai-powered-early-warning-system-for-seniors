@@ -63,3 +63,9 @@ The score is decision support only. A care coordinator makes the final human dec
 - Recording requires microphone permission and works in browsers that support SpeechRecognition.
 - The Express `/api/nlp/analyze` endpoint applies explainable keyword, negation and urgent-signal rules.
 - Member notes are analyzed when submitted and the result is stored with the SQLite member record.
+
+## Vitals and explainable risk
+
+- Vitals can be entered manually or supplied by connected devices through `POST /api/vitals`.
+- Reading history is persisted per senior and available through `GET /api/vitals/:seniorId`.
+- Risk scoring combines personal-trend deviation, median absolute deviation, recent persistence, weighted changed signals and plain-language contributions.

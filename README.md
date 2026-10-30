@@ -44,6 +44,7 @@ All data is synthetic. This UI flags risk and routes to a human; it does not dia
 - `POST /api/checkins` and `GET /api/checkins/:seniorId` — senior check-ins
 - `POST /api/followups` and `PATCH /api/followups/:id/complete` — care follow-ups
 - `POST /api/member-updates` — member health submissions
+- `POST /api/vitals` and `GET /api/vitals/:seniorId` — manually entered or device-reported vitals
 - `POST /api/nlp/analyze` — classify Hindi/English health-note signals, negation, urgency and confidence
 - `POST /api/alerts/:id/feedback` — alert usefulness feedback
 - `GET /api/operations` — operations and feedback summary

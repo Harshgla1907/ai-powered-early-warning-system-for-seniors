@@ -495,6 +495,11 @@ h2 {
 .lang { display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; }
 .mic { background: var(--brand); color: #fff; border-color: var(--brand); }
 .mic:hover { background: #185a57; }
+.speak-button {
+  background: #eef6f4;
+  border-color: #9bbab4;
+  color: var(--ink);
+}
 .hint { color: var(--muted); font-size: 15px; }
 .checkin-icon {
   display: grid;
@@ -1833,7 +1838,46 @@ h1, h2 {
   letter-spacing: 0.08em;
 }
 
+.vitals-entry {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.vitals-entry label {
+  margin: 0 !important;
+}
+
+.vitals-entry label span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.vitals-entry input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: #fff;
+}
+
+.vitals-entry input:focus {
+  border-color: var(--brand);
+  outline: 3px solid rgba(31, 111, 107, 0.15);
+}
+
 @media (max-width: 620px) {
+  .vitals-entry {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .voice-input-row {
     align-items: stretch;
     flex-direction: column;

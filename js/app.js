@@ -14,6 +14,7 @@ const state = {
   memberOther: "",
   memberSubmitted: false,
   memberAnalysis: null,
+  memberVitals: { systolic: "", diastolic: "", pulse: "", spo2: "", glucose: "" },
   checkinAnswers: [],
   voiceStatus: "",
   voiceRecognition: null
@@ -223,6 +224,16 @@ view.addEventListener("click", e => {
   if (d.memberVoice) {
     startMemberVoice();
   }
+  if (d.speak) {
+    const question = QUESTIONS[state.step];
+    if (question && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(question[state.lang]);
+      utterance.lang = state.lang === "hi" ? "hi-IN" : "en-IN";
+      utterance.rate = 0.82;
+      window.speechSynthesis.speak(utterance);
+    }
+  }
   if (d.voice) {
     startSeniorVoice();
   }
@@ -241,6 +252,9 @@ view.addEventListener("input", e => {
   if (e.target.id === "memberOther") {
     state.memberOther = e.target.value;
     state.memberAnalysis = null;
+  }
+  if (e.target.dataset.memberVital) {
+    state.memberVitals[e.target.dataset.memberVital] = e.target.value;
   }
 });
 
@@ -319,6 +333,17 @@ async function submitMemberUpdate(currentState) {
     if (!response.ok) throw new Error("Health update failed");
     const saved = await response.json();
     currentState.memberAnalysis = saved.nlp || null;
+    const vitals = {};
+    for (const [key, value] of Object.entries(currentState.memberVitals)) {
+      if (value !== "" && Number.isFinite(Number(value))) vitals[key] = Number(value);
+    }
+    if (Object.keys(vitals).length) {
+      await fetch("/api/vitals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seniorId: 1, ...vitals, source: "member_voice_or_manual" })
+      });
+    }
     setApiStatus("success", "Health update shared with the care team.");
     render();
   } catch {
