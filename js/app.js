@@ -13,7 +13,10 @@ const state = {
   memberLiteracy: "",
   memberOther: "",
   memberSubmitted: false,
-  checkinAnswers: []
+  memberAnalysis: null,
+  checkinAnswers: [],
+  voiceStatus: "",
+  voiceRecognition: null
 };
 
 const view = document.getElementById("view");
@@ -62,6 +65,121 @@ document.querySelector(".language-switch").addEventListener("click", e => {
   render();
 });
 
+function createSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return null;
+  const recognition = new SpeechRecognition();
+  recognition.lang = state.lang === "hi" ? "hi-IN" : "en-IN";
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  recognition.maxAlternatives = 1;
+  return recognition;
+}
+
+function startSeniorVoice() {
+  if (state.voiceRecognition) state.voiceRecognition.stop();
+  const recognition = createSpeechRecognition();
+  if (!recognition) {
+    setApiStatus("error", state.lang === "hi" ? "इस ब्राउज़र में आवाज़ पहचान उपलब्ध नहीं है। नीचे जवाब चुनें।" : "Voice recognition is not available in this browser. Please choose an answer below.");
+    return;
+  }
+  state.voice = true;
+  state.voiceStatus = state.lang === "hi" ? "बोलना शुरू करें..." : "Start speaking...";
+  recognition.onresult = event => {
+    const transcript = Array.from(event.results).map(result => result[0].transcript).join(" ").trim();
+    state.voiceStatus = transcript;
+    if (event.results[event.results.length - 1].isFinal && transcript) {
+      const question = QUESTIONS[state.step];
+      if (question) {
+        state.checkinAnswers.push({
+          question: question[state.lang],
+          answer: transcript,
+          source: "voice"
+        });
+      }
+      if (state.step >= QUESTIONS.length - 1) {
+        submitCheckin(state.checkinAnswers, true);
+        state.checkinAnswers = [];
+      }
+      state.step += 1;
+      state.voice = false;
+      state.voiceStatus = "";
+      render();
+    } else {
+      render();
+    }
+  };
+  recognition.onerror = event => {
+    state.voice = false;
+    state.voiceStatus = "";
+    const message = event.error === "not-allowed"
+      ? (state.lang === "hi" ? "माइक्रोफ़ोन अनुमति दें।" : "Please allow microphone access.")
+      : (state.lang === "hi" ? "आवाज़ साफ़ सुनाई नहीं दी। फिर कोशिश करें।" : "The voice could not be understood. Please try again.");
+    setApiStatus("error", message);
+    render();
+  };
+  recognition.onend = () => {
+    if (state.voice) {
+      state.voice = false;
+      state.voiceStatus = "";
+      render();
+    }
+  };
+  state.voiceRecognition = recognition;
+  recognition.start();
+  render();
+}
+
+function stopMemberVoice() {
+  if (state.voiceRecognition) {
+    state.voiceRecognition.stop();
+  }
+}
+
+function startMemberVoice() {
+  if (state.voiceRecognition) state.voiceRecognition.stop();
+  const recognition = createSpeechRecognition();
+  if (!recognition) {
+    setApiStatus("error", state.lang === "hi" ? "इस ब्राउज़र में आवाज़ पहचान उपलब्ध नहीं है। टेक्स्ट लिखकर जानकारी दें।" : "Voice recognition is unavailable in this browser. Please type your health update.");
+    return;
+  }
+  state.voice = true;
+  state.voiceStatus = state.lang === "hi" ? "बोलना शुरू करें..." : "Start speaking...";
+  recognition.onresult = event => {
+    const transcript = Array.from(event.results).map(result => result[0].transcript).join(" ").trim();
+    state.voiceStatus = transcript;
+    if (event.results[event.results.length - 1].isFinal && transcript) {
+      state.memberOther = state.memberOther.trim()
+        ? `${state.memberOther.trim()} ${transcript}`
+        : transcript;
+      state.voice = false;
+      state.voiceStatus = "";
+      render();
+    } else {
+      render();
+    }
+  };
+  recognition.onerror = event => {
+    state.voice = false;
+    state.voiceStatus = "";
+    const message = event.error === "not-allowed"
+      ? (state.lang === "hi" ? "माइक्रोफ़ोन अनुमति दें।" : "Please allow microphone access.")
+      : (state.lang === "hi" ? "आवाज़ साफ़ सुनाई नहीं दी। फिर कोशिश करें।" : "The voice could not be understood. Please try again.");
+    setApiStatus("error", message);
+    render();
+  };
+  recognition.onend = () => {
+    if (state.voice) {
+      state.voice = false;
+      state.voiceStatus = "";
+      render();
+    }
+  };
+  state.voiceRecognition = recognition;
+  recognition.start();
+  render();
+}
+
 // One click handler for the whole page, it checks data attributes
 view.addEventListener("click", e => {
   const t = e.target.closest("button");
@@ -92,6 +210,7 @@ view.addEventListener("click", e => {
       ? state.memberConcerns.delete(d.concern)
       : state.memberConcerns.add(d.concern);
     state.memberSubmitted = false;
+    state.memberAnalysis = null;
   }
   if (d.literacy) {
     state.memberLiteracy = d.literacy;
@@ -101,19 +220,11 @@ view.addEventListener("click", e => {
     state.memberSubmitted = true;
     submitMemberUpdate(state);
   }
+  if (d.memberVoice) {
+    startMemberVoice();
+  }
   if (d.voice) {
-    state.voice = true;
-    setTimeout(() => {
-      state.voice = false;
-      const question = QUESTIONS[state.step];
-      if (question) state.checkinAnswers.push({ question: question[state.lang], answer: "Voice response recorded", source: "voice" });
-      if (state.step >= QUESTIONS.length - 1) {
-        submitCheckin(state.checkinAnswers, true);
-        state.checkinAnswers = [];
-      }
-      state.step += 1;
-      render();
-    }, 2000);
+    startSeniorVoice();
   }
   if (d.restart) state.step = 0;
   render();
@@ -129,6 +240,7 @@ view.addEventListener("change", e => {
 view.addEventListener("input", e => {
   if (e.target.id === "memberOther") {
     state.memberOther = e.target.value;
+    state.memberAnalysis = null;
   }
 });
 
@@ -200,11 +312,15 @@ async function submitMemberUpdate(currentState) {
         concerns: Array.from(currentState.memberConcerns),
         literacy: currentState.memberLiteracy,
         notes: currentState.memberOther,
+        language: currentState.lang,
         consent: true
       })
     });
     if (!response.ok) throw new Error("Health update failed");
+    const saved = await response.json();
+    currentState.memberAnalysis = saved.nlp || null;
     setApiStatus("success", "Health update shared with the care team.");
+    render();
   } catch {
     setApiStatus("error", "Health update was not shared. Please retry.", true);
   }

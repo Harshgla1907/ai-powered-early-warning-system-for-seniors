@@ -19,7 +19,7 @@ For an offline static preview, open `index.html` directly.
 ## Screens
 
 - **Care Coordinator** (`#coordinator`): ranked daily list, reasons in plain language, suggested next step, useful / not useful feedback.
-- **Senior check-in** (`#senior`): big one-tap answers and a voice option (simulated).
+- **Senior check-in** (`#senior`): big one-tap answers and browser speech-to-text in Hindi or English.
 - **Member dashboard** (`#member`): users report health problems, choose reading/writing support, add notes and submit a care-team update.
 - **Family** (`#family`): short weekly summary, urgent banner only when serious.
 - **Operations** (`#operations`): alert volumes, response times and outcomes by city.
@@ -44,6 +44,7 @@ All data is synthetic. This UI flags risk and routes to a human; it does not dia
 - `POST /api/checkins` and `GET /api/checkins/:seniorId` — senior check-ins
 - `POST /api/followups` and `PATCH /api/followups/:id/complete` — care follow-ups
 - `POST /api/member-updates` — member health submissions
+- `POST /api/nlp/analyze` — classify Hindi/English health-note signals, negation, urgency and confidence
 - `POST /api/alerts/:id/feedback` — alert usefulness feedback
 - `GET /api/operations` — operations and feedback summary
 - `POST /api/auth/login` — demo role login (`coordinator`, `admin`, `senior`, or `family`; password: `samarth123`)

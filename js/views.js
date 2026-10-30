@@ -115,7 +115,7 @@ function seniorView(state) {
   const answers = ANSWERS[lang]
     .map((a, i) => `<button class="big ${i === 0 ? "good" : i === 2 ? "bad" : ""}" data-answer="${i}">${a}</button>`).join("");
   const hint = state.voice
-    ? copy(state, "Recording... (demo)", "रिकॉर्ड हो रहा है... (डेमो)")
+    ? copy(state, state.voiceStatus || "Listening...", state.voiceStatus || "सुन रहा हूँ...")
     : copy(state, "Or give a missed call to our number", "या हमारे नंबर पर मिस्ड कॉल दें");
   return `
     <div class="senior-wrap"><div class="phone">
@@ -160,6 +160,12 @@ function memberView(state) {
   `).join("");
   const submitted = state.memberSubmitted
     ? `<div class="member-success"><b>${copy(state, "Thank you. Your update has been shared with the care team.", "धन्यवाद। आपकी जानकारी देखभाल टीम के साथ साझा कर दी गई है।")}</b><span>${copy(state, "They will review it during the next check-in. For urgent symptoms, contact your doctor or emergency service.", "टीम अगली जाँच में इसे देखेगी। आपात स्थिति में डॉक्टर या स्थानीय इमरजेंसी सेवा से संपर्क करें।")}</span></div>`
+    : "";
+  const analysis = state.memberAnalysis
+    ? `<div class="nlp-result ${state.memberAnalysis.riskLevel}">
+        <div><b>${copy(state, "Voice or text review", "आवाज़ या टेक्स्ट की समीक्षा")}</b><span>${copy(state, state.memberAnalysis.summary, state.memberAnalysis.summary)}</span></div>
+        <strong>${state.memberAnalysis.riskLevel.toUpperCase()}</strong>
+      </div>`
     : "";
   return `
     <div class="member-dashboard">
@@ -209,6 +215,16 @@ function memberView(state) {
         </div>
         <label for="memberOther">${copy(state, "Write in a sentence, or ask the care team to write it for you", "एक वाक्य में लिखें, या टीम से लिखवाने के लिए कहें")}</label>
         <textarea id="memberOther" rows="4" placeholder="${copy(state, "Example: My BP was 158/96 and I missed my morning tablet.", "उदाहरण: मेरा बीपी 158/96 था और मैंने सुबह की दवा मिस कर दी।")}">${state.memberOther}</textarea>
+        <div class="voice-input-row">
+          <button type="button" class="btn voice" data-member-voice="1" aria-pressed="${state.voice}">
+            <span class="mic-icon">${state.voice ? "●" : "◉"}</span>
+            ${state.voice
+              ? copy(state, "Listening...", "सुन रहा हूँ...")
+              : copy(state, "Record voice and convert to text", "आवाज़ रिकॉर्ड करें और टेक्स्ट में बदलें")}
+          </button>
+          <span class="voice-status">${state.voice ? (state.voiceStatus || copy(state, "Start speaking...", "बोलना शुरू करें...")) : copy(state, "Hindi and English voice supported", "हिंदी और अंग्रेज़ी आवाज़ उपलब्ध")}</span>
+        </div>
+        ${analysis}
         <div class="member-actions">
           <button class="btn primary" data-member-submit="1">${copy(state, "Share this update", "यह जानकारी साझा करें")}</button>
           <span>${copy(state, "Only your care team can see this update.", "यह जानकारी केवल आपकी देखभाल टीम देख सकती है।")}</span>

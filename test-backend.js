@@ -56,9 +56,18 @@ async function run() {
   const memberUpdate = await request("/api/member-updates", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ seniorId: 1, concerns: ["bp"], literacy: "comfortable", notes: "Backend test", consent: true })
+    body: JSON.stringify({ seniorId: 1, concerns: ["bp"], literacy: "comfortable", notes: "Missed my morning BP tablet and I feel dizzy", language: "en", consent: true })
   });
-  if (memberUpdate.status !== 201) throw new Error("Member update API failed");
+  if (memberUpdate.status !== 201 || memberUpdate.body.nlp?.riskLevel !== "high") throw new Error("Member NLP update API failed");
+
+  const nlp = await request("/api/nlp/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: "मुझे सीने में दर्द है और सांस लेने में परेशानी है", language: "hi" })
+  });
+  if (nlp.status !== 200 || nlp.body.urgent !== true || !["high", "medium", "low"].includes(nlp.body.riskLevel)) {
+    throw new Error("Hindi NLP analysis API failed");
+  }
 
   const risk = await request("/api/risk/calculate", {
     method: "POST",

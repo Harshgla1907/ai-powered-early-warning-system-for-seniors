@@ -88,6 +88,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_alert_feedback_senior ON alert_feedback(senior_id, id DESC);
 `);
 
+const memberColumns = db.prepare("PRAGMA table_info(member_updates)").all();
+if (!memberColumns.some(column => column.name === "nlp_analysis")) {
+  db.exec("ALTER TABLE member_updates ADD COLUMN nlp_analysis TEXT");
+}
+
 const seed = [
   [1, "Anshika Priya", 78, "Mathura", "Hindi", 86, ["Slept about 3 hours less than usual", "Missed her morning BP tablet 3 times", "Mentioned dizziness and said she has not eaten", "BP is higher than her normal range"], "Call today. Ask about dizziness and meals, then review medicines.", { bp: "158/96", spo2: "96%", sugar: "142", weight: "54 kg" }, ["bp"], "I have been feeling dizzy this morning, and I have not eaten anything yet.", "Missed yesterday", [22,25,31,44,58,71,86]],
   [2, "Priya Sharma", 82, "Jaipur", "Hindi", 79, ["Evening check-in missed 3 days in a row", "SpO2 is below her own average", "Mentioned a fall in the bathroom"], "Send a nearby coordinator within 24 hours and confirm she is safe.", { bp: "132/84", spo2: "90%", sugar: "118", weight: "63 kg" }, ["spo2"], "I slipped in the bathroom, but I am feeling better now.", "3 days ago", [30,28,35,40,52,66,79]],
@@ -140,6 +145,56 @@ function seniorExists(id) {
   return Boolean(db.prepare("SELECT 1 FROM seniors WHERE id = ?").get(id));
 }
 
+function analyzeHealthText(text = "", language = "en") {
+  const normalized = String(text).toLowerCase();
+  const signals = [
+    { key: "bp", terms: ["blood pressure", "bp", "बीपी", "ब्लड प्रेशर", "प्रेशर"] },
+    { key: "medicine", terms: ["medicine", "tablet", "dose", "दवा", "गोली"] },
+    { key: "sleep", terms: ["sleep", "insomnia", "नींद"] },
+    { key: "food", terms: ["eat", "food", "appetite", "weakness", "खाना", "भूख", "कमजोर"] },
+    { key: "pain", terms: ["pain", "ache", "hurt", "दर्द"] }
+  ];
+  const urgentTerms = [
+    "chest pain", "cannot breathe", "can't breathe", "fainting", "stroke",
+    "सीने में दर्द", "सांस नहीं", "बेहोश", "चक्कर बहुत ज्यादा"
+  ];
+  const negationTerms = ["no ", "not ", "without ", "never ", "नहीं", "नही", "बिना"];
+  const matched = [];
+  const excluded = [];
+
+  for (const signal of signals) {
+    const term = signal.terms.find(value => normalized.includes(value));
+    if (!term) continue;
+    const termIndex = normalized.indexOf(term);
+    const beforeTerm = normalized.slice(Math.max(0, termIndex - 18), termIndex);
+    const afterTerm = normalized.slice(termIndex + term.length, termIndex + term.length + 5);
+    const context = `${beforeTerm} ${afterTerm}`;
+    if (negationTerms.some(value => context.includes(value))) excluded.push(signal.key);
+    else matched.push({ key: signal.key, evidence: term });
+  }
+
+  const urgent = urgentTerms.some(term => normalized.includes(term));
+  const missedMedicine = /missed|forgot|skip|छूट|भूल|नहीं ली/i.test(normalized);
+  const highRisk = urgent || missedMedicine && /medicine|tablet|dose|दवा|गोली/i.test(normalized);
+  const categories = [...new Map(matched.map(item => [item.key, item])).values()];
+  const score = highRisk ? 88 : categories.length >= 2 ? 62 : categories.length ? 42 : 18;
+
+  return {
+    language,
+    categories,
+    negatedCategories: [...new Set(excluded)],
+    urgent,
+    missedMedicine,
+    riskLevel: score >= 70 ? "high" : score >= 45 ? "medium" : "low",
+    confidence: categories.length || urgent ? 0.82 : 0.55,
+    summary: highRisk
+      ? (language === "hi" ? "तुरंत मानवीय समीक्षा की आवश्यकता वाले संकेत मिले।" : "Signals were found that require prompt human review.")
+      : categories.length
+        ? (language === "hi" ? "स्वास्थ्य चिंता पहचान ली गई है और देखभाल टीम को भेजी जाएगी।" : "Health concern signals were identified for care-team review.")
+        : (language === "hi" ? "कोई स्पष्ट चिंता शब्द नहीं मिला। देखभाल टीम वांछित विवरण देख सकती है।" : "No clear concern was detected; the care team can review the full note.")
+  };
+}
+
 const crypto = require("crypto");
 const sessions = new Map();
 const userInsert = db.prepare("INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)");
@@ -188,6 +243,19 @@ app.get("/api/auth/me", (req, res) => {
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", database: "connected", service: "Samarth Early Warning API", timestamp: new Date().toISOString() });
+});
+
+app.post("/api/nlp/analyze", (req, res) => {
+  const { text = "", language = "en" } = req.body;
+  if (typeof text !== "string" || text.length > 5000) {
+    return res.status(400).json({ error: "text must be a string of at most 5000 characters" });
+  }
+  if (!["en", "hi"].includes(language)) {
+    return res.status(400).json({ error: "language must be en or hi" });
+  }
+  const analysis = analyzeHealthText(text, language);
+  audit("member", "analyze", "nlp_note", null, { language, categories: analysis.categories.map(item => item.key), urgent: analysis.urgent });
+  res.json(analysis);
 });
 
 app.get("/api/dashboard", (req, res) => {
@@ -340,12 +408,14 @@ app.post("/api/member-updates", (req, res) => {
   if (!Array.from(concerns).every(value => typeof value === "string")) {
     return res.status(400).json({ error: "Each concern must be a string" });
   }
+  if (typeof notes !== "string") return res.status(400).json({ error: "notes must be a string" });
+  const nlp = analyzeHealthText(notes, req.body.language === "hi" ? "hi" : "en");
   const result = db.prepare(`
-    INSERT INTO member_updates (senior_id, concerns, literacy, notes, consent, created_at)
-    VALUES (?, ?, ?, ?, ?, datetime('now'))
-  `).run(seniorId, JSON.stringify(concerns), literacy, notes, consent ? 1 : 0);
+    INSERT INTO member_updates (senior_id, concerns, literacy, notes, consent, nlp_analysis, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+  `).run(seniorId, JSON.stringify(concerns), literacy, notes, consent ? 1 : 0, JSON.stringify(nlp));
   audit("member", "submit", "member_update", result.lastInsertRowid, { seniorId, consent });
-  res.status(201).json({ id: result.lastInsertRowid, seniorId, concerns, literacy, notes, consent });
+  res.status(201).json({ id: result.lastInsertRowid, seniorId, concerns, literacy, notes, consent, nlp });
 });
 
 app.get("/api/member-updates/:seniorId", (req, res) => {
@@ -354,7 +424,9 @@ app.get("/api/member-updates/:seniorId", (req, res) => {
   const rows = db.prepare("SELECT * FROM member_updates WHERE senior_id = ? ORDER BY id DESC").all(seniorId);
   res.json(rows.map(row => ({
     id: row.id, seniorId: row.senior_id, concerns: JSON.parse(row.concerns),
-    literacy: row.literacy, notes: row.notes, consent: Boolean(row.consent), createdAt: row.created_at
+    literacy: row.literacy, notes: row.notes, consent: Boolean(row.consent),
+    nlp: row.nlp_analysis ? JSON.parse(row.nlp_analysis) : null,
+    createdAt: row.created_at
   })));
 });
 

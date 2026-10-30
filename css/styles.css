@@ -1761,6 +1761,93 @@ h1, h2 {
   }
 }
 
+.voice-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.btn.voice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  padding: 0 14px;
+}
+
+.btn.voice[aria-pressed="true"] {
+  border-color: var(--high);
+  background: #fff0ed;
+  color: var(--high);
+}
+
+.mic-icon {
+  font-size: 18px;
+}
+
+.voice-status {
+  flex: 1;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.nlp-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--low);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f8fbfa;
+}
+
+.nlp-result div {
+  display: flex;
+  flex-direction: column;
+}
+
+.nlp-result span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.nlp-result.medium {
+  border-left-color: var(--mid);
+}
+
+.nlp-result.high {
+  border-left-color: var(--high);
+  background: #fff8f6;
+}
+
+.nlp-result strong {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 620px) {
+  .voice-input-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .voice-status {
+    min-height: 20px;
+  }
+
+  .nlp-result {
+    align-items: flex-start;
+  }
+}
+
 /* Operations analytics layout */
 .operations-dashboard {
   max-width: 1120px;

@@ -8,6 +8,9 @@ flowchart LR
     F --> A[Node.js Express REST API]
     A --> D[(SQLite Database)]
     A --> R[Rolling Risk Calculator]
+    F --> V[Browser Speech Recognition]
+    V --> N[Hindi English NLP Analyzer]
+    N --> A
     R --> F
     A --> L[Audit Log]
 ```
@@ -53,3 +56,10 @@ The score is decision support only. A care coordinator makes the final human dec
 - Error banners display API or network failures with retry.
 - Static sample data remains available if the backend cannot be reached.
 - API errors return JSON with an `error` field and the appropriate HTTP status.
+
+## Voice and NLP
+
+- The browser Web Speech API records speech and converts Hindi or English audio to editable text.
+- Recording requires microphone permission and works in browsers that support SpeechRecognition.
+- The Express `/api/nlp/analyze` endpoint applies explainable keyword, negation and urgent-signal rules.
+- Member notes are analyzed when submitted and the result is stored with the SQLite member record.
