@@ -63,6 +63,7 @@ The score is decision support only. A care coordinator makes the final human dec
 - Recording requires microphone permission and works in browsers that support SpeechRecognition.
 - The Express `/api/nlp/analyze` endpoint applies explainable keyword, negation and urgent-signal rules.
 - Member notes are analyzed when submitted and the result is stored with the SQLite member record.
+- Voice health chat asks sequential spoken questions, captures Hindi or English speech, stores transcripts as member notes and submits the update after the conversation.
 
 ## Vitals and explainable risk
 

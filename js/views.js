@@ -214,6 +214,28 @@ function memberView(state) {
         <div class="section-heading">
           <div><p class="eyebrow">${copy(state, "Step 3", "कदम 3")}</p><h2>${copy(state, "Describe any other problem", "कोई दूसरी परेशानी बताएं")}</h2></div>
         </div>
+        <div class="voice-chat-card ${state.voiceChat.active ? "active" : ""}" aria-live="polite">
+          <div class="voice-chat-header">
+            <div>
+              <span class="voice-chat-icon">${state.voiceChat.active ? "●" : "◉"}</span>
+              <div>
+                <b>${copy(state, "Talk to Samarth", "समर्थ से बात करें")}</b>
+                <small>${state.voiceChat.active
+                  ? copy(state, "Voice assistant is listening", "आवाज़ सहायक सुन रहा है")
+                  : copy(state, "No reading or writing needed", "पढ़ने या लिखने की जरूरत नहीं")}</small>
+              </div>
+            </div>
+            <button type="button" class="${state.voiceChat.active ? "btn stop" : "btn primary"}" data-${state.voiceChat.active ? "stop-voice-chat" : "voice-chat"}="1">
+              ${state.voiceChat.active
+                ? copy(state, "Stop chat", "चैट रोकें")
+                : copy(state, "Start voice chat", "आवाज़ चैट शुरू करें")}
+            </button>
+          </div>
+          ${state.voiceChat.transcript.length ? `<div class="voice-chat-transcript">
+            ${state.voiceChat.transcript.map((item, index) => `<div><span>${index + 1}</span><p><b>${copy(state, "You said", "आपने कहा")}:</b> ${item.answer}</p></div>`).join("")}
+          </div>` : ""}
+          ${state.voiceChat.active ? `<div class="voice-chat-live"><span></span><b>${state.voiceStatus || copy(state, "Listening...", "सुन रहा हूँ...")}</b></div>` : ""}
+        </div>
         <label for="memberOther">${copy(state, "Write in a sentence, or ask the care team to write it for you", "एक वाक्य में लिखें, या टीम से लिखवाने के लिए कहें")}</label>
         <textarea id="memberOther" rows="4" placeholder="${copy(state, "Example: My BP was 158/96 and I missed my morning tablet.", "उदाहरण: मेरा बीपी 158/96 था और मैंने सुबह की दवा मिस कर दी।")}">${state.memberOther}</textarea>
         <div class="vitals-entry" aria-label="${copy(state, "Optional vital readings", "वैकल्पिक स्वास्थ्य रीडिंग")}">

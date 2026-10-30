@@ -17,7 +17,13 @@ const state = {
   memberVitals: { systolic: "", diastolic: "", pulse: "", spo2: "", glucose: "" },
   checkinAnswers: [],
   voiceStatus: "",
-  voiceRecognition: null
+  voiceRecognition: null,
+  voiceChat: {
+    active: false,
+    step: 0,
+    transcript: [],
+    interim: ""
+  }
 };
 
 const view = document.getElementById("view");
@@ -127,7 +133,12 @@ function startSeniorVoice() {
     }
   };
   state.voiceRecognition = recognition;
-  recognition.start();
+  const question = QUESTIONS[state.step];
+  if (question) {
+    speakAssistant(question[state.lang], () => recognition.start());
+  } else {
+    recognition.start();
+  }
   render();
 }
 
@@ -135,6 +146,117 @@ function stopMemberVoice() {
   if (state.voiceRecognition) {
     state.voiceRecognition.stop();
   }
+}
+
+function voiceChatPrompts() {
+  return state.lang === "hi"
+    ? [
+        "Namaste. Main aapki madad karunga. Aaj aapko kis tarah ki takleef hai?",
+        "Dawaai ke baare mein batayiye. Kya koi dose chhoot gayi, ya koi side effect hai?",
+        "Kya aapke BP, sugar ya pulse ki koi reading hai?",
+        "Ab koi aur zaroori baat batayiye. Main suna raha hoon."
+      ]
+    : [
+        "Hello. I am here to help you. What health problem are you experiencing today?",
+        "Please tell me about your medicines. Did you miss a dose or have any side effect?",
+        "Do you know your blood pressure, sugar or pulse reading?",
+        "Please tell me anything else important you would like the care team to know."
+      ];
+}
+
+function speakAssistant(text, onEnd) {
+  if (!("speechSynthesis" in window)) {
+    if (onEnd) onEnd();
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = state.lang === "hi" ? "hi-IN" : "en-IN";
+  utterance.rate = 0.78;
+  utterance.pitch = 1;
+  utterance.onend = () => { if (onEnd) onEnd(); };
+  window.speechSynthesis.speak(utterance);
+}
+
+function listenForVoiceChatAnswer() {
+  const recognition = createSpeechRecognition();
+  if (!recognition) {
+    setApiStatus("error", state.lang === "hi" ? "इस ब्राउज़र में आवाज़ पहचान उपलब्ध नहीं है।" : "Voice recognition is unavailable in this browser.");
+    stopVoiceHealthChat();
+    return;
+  }
+
+  state.voiceRecognition = recognition;
+  state.voice = true;
+  state.voiceStatus = state.lang === "hi" ? "बोलिए, मैं सुन रहा हूँ..." : "Please speak, I am listening...";
+  recognition.onresult = event => {
+    const transcript = Array.from(event.results).map(result => result[0].transcript).join(" ").trim();
+    state.voiceChat.interim = transcript;
+    state.voiceStatus = transcript || state.voiceStatus;
+    if (event.results[event.results.length - 1].isFinal && transcript) {
+      recognition.stop();
+    }
+    render();
+  };
+  recognition.onend = () => {
+    const answer = state.voiceChat.interim.trim();
+    state.voiceChat.interim = "";
+    state.voice = false;
+    if (!answer || !state.voiceChat.active) {
+      render();
+      return;
+    }
+    const prompts = voiceChatPrompts();
+    const prompt = prompts[state.voiceChat.step] || "";
+    state.voiceChat.transcript.push({ prompt, answer, source: "voice" });
+    state.memberOther = state.voiceChat.transcript.map(item => item.answer).join(" ");
+    state.voiceChat.step += 1;
+    if (state.voiceChat.step >= prompts.length) {
+      state.voiceChat.active = false;
+      state.voiceStatus = "";
+      state.memberSubmitted = true;
+      submitMemberUpdate(state);
+      return;
+    }
+    render();
+    speakAssistant(prompts[state.voiceChat.step], listenForVoiceChatAnswer);
+  };
+  recognition.onerror = event => {
+    state.voice = false;
+    state.voiceStatus = event.error === "not-allowed"
+      ? (state.lang === "hi" ? "माइक्रोफ़ोन अनुमति दें।" : "Please allow microphone access.")
+      : (state.lang === "hi" ? "फिर से बोलने का प्रयास करें।" : "Please try speaking again.");
+    render();
+  };
+  recognition.start();
+  render();
+}
+
+function startVoiceHealthChat() {
+  if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+    setApiStatus("error", state.lang === "hi" ? "इस ब्राउज़र में आवाज़ चैट उपलब्ध नहीं है।" : "Voice chat is unavailable in this browser.");
+    return;
+  }
+  state.voiceChat.active = true;
+  state.voiceChat.step = 0;
+  state.voiceChat.transcript = [];
+  state.voiceChat.interim = "";
+  state.memberSubmitted = false;
+  render();
+  const prompt = voiceChatPrompts()[0];
+  speakAssistant(prompt, listenForVoiceChatAnswer);
+}
+
+function stopVoiceHealthChat() {
+  state.voiceChat.active = false;
+  state.voice = false;
+  state.voiceStatus = "";
+  if (state.voiceRecognition) {
+    state.voiceRecognition.onend = null;
+    state.voiceRecognition.stop();
+  }
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  render();
 }
 
 function startMemberVoice() {
@@ -223,6 +345,12 @@ view.addEventListener("click", e => {
   }
   if (d.memberVoice) {
     startMemberVoice();
+  }
+  if (d.voiceChat) {
+    startVoiceHealthChat();
+  }
+  if (d.stopVoiceChat) {
+    stopVoiceHealthChat();
   }
   if (d.speak) {
     const question = QUESTIONS[state.step];

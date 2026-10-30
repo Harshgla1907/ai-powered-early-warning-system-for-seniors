@@ -20,6 +20,7 @@ For an offline static preview, open `index.html` directly.
 
 - **Care Coordinator** (`#coordinator`): ranked daily list, reasons in plain language, suggested next step, useful / not useful feedback.
 - **Senior check-in** (`#senior`): big one-tap answers and browser speech-to-text in Hindi or English.
+- **Voice health chat** (`#member`): the assistant speaks each question, listens, converts the spoken answer to text, and submits the complete update.
 - **Member dashboard** (`#member`): users report health problems, choose reading/writing support, add notes and submit a care-team update.
 - **Family** (`#family`): short weekly summary, urgent banner only when serious.
 - **Operations** (`#operations`): alert volumes, response times and outcomes by city.
