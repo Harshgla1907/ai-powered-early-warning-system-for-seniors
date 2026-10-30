@@ -55,7 +55,7 @@ const SENIORS = [
     lastCheckin: "Today, 8:40 am"
   },
   {
-    id: 5, name: "Priyanshi Iyer", age: 71, city: "Chennai", lang: "English", score: 44,
+    id: 5, name: "Priyanshi Garg", age: 71, city: "Chennai", lang: "English", score: 44,
     trend: [50, 46, 45, 48, 44, 43, 44],
     reasons: ["Slightly irregular sleep this week, no other changes"],
     action: "Routine call this week. No urgent action.",

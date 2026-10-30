@@ -147,7 +147,7 @@ const seed = [
   [2, "Priya Sharma", 82, "Jaipur", "Hindi", 79, ["Evening check-in missed 3 days in a row", "SpO2 is below her own average", "Mentioned a fall in the bathroom"], "Send a nearby coordinator within 24 hours and confirm she is safe.", { bp: "132/84", spo2: "90%", sugar: "118", weight: "63 kg" }, ["spo2"], "I slipped in the bathroom, but I am feeling better now.", "3 days ago", [30,28,35,40,52,66,79]],
   [3, "Harsh Kumar", 74, "Kochi", "English", 68, ["Sugar readings rising for five days", "Has mentioned feeling lonely", "Two calls mention skipped dinners"], "Friendly call this afternoon and flag the sugar trend for her doctor.", { bp: "126/80", spo2: "97%", sugar: "188", weight: "58 kg" }, ["sugar"], "I am okay, just don't feel like cooking.", "Today, 9:10 am", [40,38,44,47,55,62,68]],
   [4, "Gauri Singh", 80, "Ludhiana", "Hindi", 57, ["Much less movement than normal for two days", "Weight down 2 kg in two weeks"], "Schedule a call in the next two days.", { bp: "130/82", spo2: "95%", sugar: "110", weight: "69 kg" }, [], "I feel weak and have not had much appetite.", "Today, 8:40 am", [35,40,42,48,50,54,57]],
-  [5, "Priyanshi Iyer", 71, "Chennai", "English", 44, ["Slightly irregular sleep this week"], "Routine call this week. No urgent action.", { bp: "122/78", spo2: "98%", sugar: "104", weight: "60 kg" }, [], "All fine. My grandson visited on Sunday.", "Today, 10:00 am", [50,46,45,48,44,43,44]],
+  [5, "Priyanshi Garg", 71, "Chennai", "English", 44, ["Slightly irregular sleep this week"], "Routine call this week. No urgent action.", { bp: "122/78", spo2: "98%", sugar: "104", weight: "60 kg" }, [], "All fine. My grandson visited on Sunday.", "Today, 10:00 am", [50,46,45,48,44,43,44]],
   [6, "Chavii Mehta", 76, "Agra", "Hindi", 36, ["One missed tablet on Monday"], "Remind about the evening tablet on the next call.", { bp: "128/80", spo2: "96%", sugar: "112", weight: "66 kg" }, [], "Everything is fine. I went to the temple.", "Today, 7:55 am", [30,33,35,34,38,37,36]],
   [7, "Meenu Joshi", 69, "Pune", "Hindi", 21, ["All signals are close to her usual pattern"], "No action needed today.", { bp: "118/76", spo2: "98%", sugar: "98", weight: "57 kg" }, [], "I am feeling well and worked in the garden.", "Today, 9:30 am", [24,22,20,23,21,20,21]],
   [8, "Kamlesh Verma", 73, "Hyderabad", "English", 18, ["All signals are close to his usual pattern"], "No action needed today.", { bp: "120/78", spo2: "97%", sugar: "101", weight: "72 kg" }, [], "Good morning, took my walk.", "Today, 6:50 am", [20,19,18,20,17,18,18]],
@@ -170,6 +170,7 @@ for (const row of seed) {
 }
 
 db.prepare("UPDATE seniors SET name=? WHERE id=? AND name=?").run("Preeti Sharma", 1, "Anshika Priya");
+db.prepare("UPDATE seniors SET name=? WHERE id=? AND name=?").run("Priyanshi Garg", 5, "Priyanshi Iyer");
 
 const followupCount = db.prepare("SELECT COUNT(*) AS count FROM followups").get().count;
 if (followupCount === 0) {

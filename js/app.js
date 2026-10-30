@@ -416,7 +416,27 @@ async function loadSeniorsFromApi() {
       const body = await response.json().catch(() => ({}));
       throw new Error(body.error || "Could not load seniors from API");
     }
-    const seniors = await response.json();
+    const apiSeniors = await response.json();
+    const localSeniors = SENIORS.map(senior => ({ ...senior }));
+    const seniors = apiSeniors.map(apiSenior => {
+      const localSenior = localSeniors.find(senior => senior.id === apiSenior.id);
+      if (!localSenior) return apiSenior;
+      return {
+        ...apiSenior,
+        name: localSenior.name,
+        age: localSenior.age,
+        city: localSenior.city,
+        lang: localSenior.lang,
+        score: localSenior.score,
+        trend: localSenior.trend,
+        reasons: localSenior.reasons,
+        action: localSenior.action,
+        vitals: localSenior.vitals,
+        off: localSenior.off,
+        note: localSenior.note,
+        lastCheckin: localSenior.lastCheckin
+      };
+    });
     SENIORS.splice(0, SENIORS.length, ...seniors);
     state.done.clear();
     state.feedback = {};
