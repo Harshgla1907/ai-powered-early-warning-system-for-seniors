@@ -56,6 +56,9 @@ All data is synthetic. This UI flags risk and routes to a human; it does not dia
 - `GET /api/followups` and `GET /api/member-updates/:seniorId` — persisted follow-up and member records
 - `POST /api/risk/calculate` — rolling-baseline risk calculation
 - `GET /api/audit-log` — recent backend audit events
+- `GET /api/rewards/:seniorId` — redeemable balance, lifetime earned points, partner and doctor benefit
+- `POST /api/rewards/:seniorId/redeem` — redeem 250 points for a 10% pharmacy coupon
+- `POST /api/pharmacy/orders` — place a medicine order with the partner pharmacy and optional active coupon
 
 ## Backend validation
 

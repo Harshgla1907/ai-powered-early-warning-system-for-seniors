@@ -98,6 +98,41 @@ async function run() {
     throw new Error("Member history API failed");
   }
 
+  const positiveCheckin = await request("/api/checkins", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      seniorId: 1,
+      language: "en",
+      answers: [
+        { question: "How are you feeling?", answer: "Good" },
+        { question: "Medicines?", answer: "Yes, taken" },
+        { question: "Meals?", answer: "Yes, eaten well" }
+      ],
+      voiceUsed: false
+    })
+  });
+  if (positiveCheckin.status !== 201 || positiveCheckin.body.positiveAnswers !== 3 || positiveCheckin.body.reward.points !== 15) {
+    throw new Error("Positive check-in rewards failed");
+  }
+
+  const rewards = await request("/api/rewards/1");
+  if (rewards.status !== 200 || rewards.body.partner !== "Samarth Health Pharmacy" || rewards.body.redemptionMinimum !== 250) {
+    throw new Error("Rewards account API failed");
+  }
+
+  const pharmacyOrder = await request("/api/pharmacy/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      seniorId: 1,
+      items: [{ name: "General medicine", price: 1000, quantity: 1 }]
+    })
+  });
+  if (pharmacyOrder.status !== 201 || pharmacyOrder.body.partner !== "Samarth Health Pharmacy" || pharmacyOrder.body.payableAmount !== 1000) {
+    throw new Error("Partner pharmacy order API failed");
+  }
+
   const followup = await request("/api/seniors/1", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

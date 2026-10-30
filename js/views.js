@@ -108,6 +108,7 @@ function seniorView(state) {
       <div class="checkin-icon">✓</div>
       <h1>${copy(state, "Thank you", "धन्यवाद")}</h1>
       <p class="q">${copy(state, "Your answers have been saved. Your care coordinator will get in touch if a follow-up is needed.", "आपके जवाब सुरक्षित हो गए हैं। फ़ॉलो-अप की ज़रूरत हो तो देखभाल समन्वयक आपसे संपर्क करेंगे।")}</p>
+      ${state.checkinReward?.points ? `<div class="member-success"><b>${copy(state, `You earned ${state.checkinReward.points} reward points!`, `आपको ${state.checkinReward.points} रिवॉर्ड पॉइंट मिले!`)}</b><span>${copy(state, "Positive daily health answers help build your Samarth balance.", "सकारात्मक दैनिक स्वास्थ्य जवाब आपके समर्थ बैलेंस को बढ़ाते हैं।")}</span></div>` : ""}
       <p class="consent-note">${copy(state, "Your answers will not be shared with your family without your consent.", "आपकी सहमति के बिना आपके जवाब परिवार के साथ साझा नहीं किए जाएंगे।")}</p>
       <button class="big" data-restart="1">${copy(state, "Start again", "फिर से शुरू करें")}</button>
     </div></div>`;
@@ -171,6 +172,28 @@ function memberView(state) {
   const submitted = state.memberSubmitted
     ? `<div class="member-success"><b>${copy(state, "Thank you. Your update has been shared with the care team.", "धन्यवाद। आपकी जानकारी देखभाल टीम के साथ साझा कर दी गई है।")}</b><span>${copy(state, "They will review it during the next check-in. For urgent symptoms, contact your doctor or emergency service.", "टीम अगली जाँच में इसे देखेगी। आपात स्थिति में डॉक्टर या स्थानीय इमरजेंसी सेवा से संपर्क करें।")}</span></div>`
     : "";
+  const reward = state.rewards;
+  const pointsToPrescription = reward
+    ? Math.max(0, reward.prescriptionMilestone - reward.totalEarned)
+    : 5000;
+  const rewardCard = `
+    <section class="panel reward-card">
+      <div class="section-heading">
+        <div><p class="eyebrow">${copy(state, "Samarth Rewards", "समर्थ रिवॉर्ड्स")}</p><h2>${copy(state, "Healthy check-ins, real benefits", "अच्छी स्वास्थ्य आदतों का लाभ")}</h2></div>
+      </div>
+      <div class="reward-grid">
+        <div><span>${copy(state, "Reward balance", "रिवॉर्ड बैलेंस")}</span><b>${reward?.balance ?? 0} pts</b></div>
+        <div><span>${copy(state, "Earned so far", "अब तक कमाए")}</span><b>${reward?.totalEarned ?? 0} pts</b></div>
+        <div><span>${copy(state, "Pharmacy partner", "मेडिसिन पार्टनर")}</span><b>${reward?.partner || "Samarth Health Pharmacy"}</b></div>
+      </div>
+      ${reward?.balance >= 250 && !state.pharmacyCoupon
+        ? `<div class="reward-action"><label for="medicineName">${copy(state, "Medicine name", "दवा का नाम")}</label><input id="medicineName" type="text" placeholder="${copy(state, "Example: blood pressure medicine", "उदाहरण: ब्लड प्रेशर की दवा")}"><label for="medicineOrderAmount">${copy(state, "Medicine order amount", "मेडिसिन ऑर्डर राशि")}</label><input id="medicineOrderAmount" type="number" min="1" max="1000000" placeholder="1500" inputmode="decimal"><button type="button" class="btn primary" data-redeem-rewards="1">${copy(state, "Redeem 250 points for 10% off", "250 पॉइंट पर 10% छूट लें")}</button></div>`
+        : `<p class="sub">${copy(state, `${250 - (reward?.balance || 0)} more points needed for a 250-point pharmacy redemption.`, `250-पॉइंट फार्मेसी रिडेम्पशन के लिए अभी ${250 - (reward?.balance || 0)} पॉइंट चाहिए।`)}</p>`}
+      ${state.pharmacyCoupon ? `<div class="member-success"><b>${copy(state, `Coupon ready: ${state.pharmacyCoupon}`, `कूपन तैयार: ${state.pharmacyCoupon}`)}</b><span>${copy(state, "Enter the medicine name and order amount, then place the partner-only order.", "दवा का नाम और ऑर्डर राशि डालें, फिर पार्टनर-अनुबंधित ऑर्डर दें।")}</span><button type="button" class="btn primary" data-place-pharmacy-order="1">${copy(state, "Place order at Samarth Health Pharmacy", "समर्थ हेल्थ फार्मेसी पर ऑर्डर करें")}</button></div>` : ""}
+      <p class="sub">${reward?.prescriptionUnlocked
+        ? copy(state, "Doctor consultation benefit unlocked at 5,000 total points. Contact the care team to claim it.", "5,000 कुल पॉइंट पर डॉक्टर सलाह लाभ खुल गया। इसे पाने के लिए टीम से संपर्क करें।")
+        : copy(state, `${pointsToPrescription} more earned points until the doctor consultation benefit at 5,000 points.`, `5,000 पॉइंट पर डॉक्टर सलाह लाभ पाने के लिए ${pointsToPrescription} पॉइंट और कमाएं।`)}</p>
+    </section>`;
   const analysis = state.memberAnalysis
     ? `<div class="nlp-result ${state.memberAnalysis.riskLevel}">
         <div><b>${copy(state, "Voice or text review", "आवाज़ या टेक्स्ट की समीक्षा")}</b><span>${copy(state, state.memberAnalysis.summary, state.memberAnalysis.summary)}</span></div>
@@ -198,6 +221,7 @@ function memberView(state) {
         <div class="health-metric sleep"><span>${copy(state, "Sugar", "शुगर")}</span><b>${glucose}</b><small>${copy(state, "Latest recorded value", "नवीनतम दर्ज मान")}</small></div>
       </section>
       ${submitted}
+      ${rewardCard}
       <div class="member-grid">
         <section class="panel member-section">
           <div class="section-heading">

@@ -94,6 +94,42 @@ db.exec(`
     details TEXT,
     created_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS reward_accounts (
+    senior_id INTEGER PRIMARY KEY,
+    balance INTEGER NOT NULL DEFAULT 0,
+    total_earned INTEGER NOT NULL DEFAULT 0,
+    prescription_unlocked INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS reward_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    senior_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    points INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    balance_after INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS pharmacy_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    senior_id INTEGER NOT NULL,
+    partner TEXT NOT NULL,
+    items TEXT NOT NULL,
+    order_amount REAL NOT NULL,
+    discount_amount REAL NOT NULL DEFAULT 0,
+    payable_amount REAL NOT NULL,
+    coupon_code TEXT,
+    status TEXT NOT NULL DEFAULT 'confirmed',
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS reward_redemptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    senior_id INTEGER NOT NULL,
+    coupon_code TEXT UNIQUE NOT NULL,
+    discount_percent INTEGER NOT NULL DEFAULT 10,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL
+  );
   CREATE INDEX IF NOT EXISTS idx_checkins_senior ON checkins(senior_id, id DESC);
   CREATE INDEX IF NOT EXISTS idx_followups_status ON followups(status, id DESC);
   CREATE INDEX IF NOT EXISTS idx_member_updates_senior ON member_updates(senior_id, id DESC);
@@ -168,6 +204,33 @@ function validId(value) {
 
 function seniorExists(id) {
   return Boolean(db.prepare("SELECT 1 FROM seniors WHERE id = ?").get(id));
+}
+
+function ensureRewardAccount(seniorId) {
+  db.prepare(`
+    INSERT OR IGNORE INTO reward_accounts
+      (senior_id, balance, total_earned, prescription_unlocked, updated_at)
+    VALUES (?, 0, 0, 0, datetime('now'))
+  `).run(seniorId);
+  return db.prepare("SELECT * FROM reward_accounts WHERE senior_id = ?").get(seniorId);
+}
+
+function addRewardPoints(seniorId, points, description) {
+  const account = ensureRewardAccount(seniorId);
+  const balance = account.balance + points;
+  const totalEarned = account.total_earned + points;
+  const prescriptionUnlocked = account.prescription_unlocked || (totalEarned >= 5000 ? 1 : 0);
+  db.prepare(`
+    UPDATE reward_accounts
+    SET balance=?, total_earned=?, prescription_unlocked=?, updated_at=datetime('now')
+    WHERE senior_id=?
+  `).run(balance, totalEarned, prescriptionUnlocked, seniorId);
+  db.prepare(`
+    INSERT INTO reward_transactions
+      (senior_id, type, points, description, balance_after, created_at)
+    VALUES (?, 'earned', ?, ?, ?, datetime('now'))
+  `).run(seniorId, points, description, balance);
+  return { balance, totalEarned, prescriptionUnlocked };
 }
 
 function analyzeHealthText(text = "", language = "en") {
@@ -378,7 +441,25 @@ app.post("/api/checkins", (req, res) => {
   `).run(seniorId, language, JSON.stringify(answers), voiceUsed ? 1 : 0);
   db.prepare("UPDATE seniors SET last_checkin = 'Today' WHERE id = ?").run(seniorId);
   audit("senior", "submit", "checkin", result.lastInsertRowid, { seniorId });
-  res.status(201).json({ id: result.lastInsertRowid, seniorId, answers, voiceUsed, createdAt: new Date().toISOString() });
+  const positiveTerms = [
+    "good", "yes", "taken", "complete", "fine", "well", "eaten", "ate",
+    "अच्छा", "हाँ", "हां", "ली", "खाया", "ठीक", "पूरा", "completely"
+  ];
+  const positiveAnswers = answers.filter(answer => {
+    const value = String(answer.answer || "").toLowerCase();
+    const negative = /(not good|bad|no|missed|forgot|skipped|not eaten|not take|अच्छा नहीं|नहीं|छूट|भूल|खाना नहीं)/i.test(value);
+    return !negative && positiveTerms.some(term => value.includes(term));
+  }).length;
+  let reward = { points: 0, ...ensureRewardAccount(Number(seniorId)) };
+  if (positiveAnswers >= 2) {
+    const points = positiveAnswers === 3 ? 15 : 10;
+    const update = addRewardPoints(Number(seniorId), points, `${positiveAnswers} positive daily check-in answers`);
+    reward = { points, ...update };
+  }
+  res.status(201).json({
+    id: result.lastInsertRowid, seniorId, answers, voiceUsed,
+    createdAt: new Date().toISOString(), positiveAnswers, reward
+  });
 });
 
 app.get("/api/checkins/:seniorId", (req, res) => {
@@ -464,6 +545,117 @@ app.post("/api/alerts/:id/feedback", (req, res) => {
   db.prepare("UPDATE seniors SET feedback = ? WHERE id = ?").run(useful ? "useful" : "notuseful", seniorId);
   audit("coordinator", "feedback", "alert", seniorId, { useful: Boolean(useful) });
   res.status(201).json({ seniorId, useful });
+});
+
+app.get("/api/rewards/:seniorId", (req, res) => {
+  const seniorId = validId(req.params.seniorId);
+  if (!seniorId || !seniorExists(seniorId)) return res.status(404).json({ error: "Senior not found" });
+  const account = ensureRewardAccount(seniorId);
+  const transactions = db.prepare(`
+    SELECT * FROM reward_transactions
+    WHERE senior_id=? ORDER BY id DESC LIMIT 30
+  `).all(seniorId).map(row => ({
+    id: row.id, type: row.type, points: row.points, description: row.description,
+    balanceAfter: row.balance_after, createdAt: row.created_at
+  }));
+  res.json({
+    seniorId,
+    partner: "Samarth Health Pharmacy",
+    balance: account.balance,
+    totalEarned: account.total_earned,
+    redemptionMinimum: 250,
+    discountPercent: 10,
+    prescriptionUnlocked: Boolean(account.prescription_unlocked),
+    prescriptionMilestone: 5000,
+    doctorBenefit: account.prescription_unlocked
+      ? "Consultation voucher unlocked with an eligible partner doctor"
+      : null,
+    transactions
+  });
+});
+
+app.post("/api/rewards/:seniorId/redeem", (req, res) => {
+  const seniorId = validId(req.params.seniorId);
+  if (!seniorId || !seniorExists(seniorId)) return res.status(404).json({ error: "Senior not found" });
+  const orderAmount = Number(req.body.orderAmount);
+  if (!Number.isFinite(orderAmount) || orderAmount <= 0 || orderAmount > 1000000) {
+    return res.status(400).json({ error: "Valid orderAmount is required" });
+  }
+  const account = ensureRewardAccount(seniorId);
+  if (account.balance < 250) {
+    return res.status(400).json({ error: "At least 250 reward points are required" });
+  }
+  const balance = account.balance - 250;
+  db.prepare(`
+    UPDATE reward_accounts SET balance=?, updated_at=datetime('now') WHERE senior_id=?
+  `).run(balance, seniorId);
+  db.prepare(`
+    INSERT INTO reward_transactions
+      (senior_id, type, points, description, balance_after, created_at)
+    VALUES (?, 'redeemed', -250, '10% discount at Samarth Health Pharmacy', ?, datetime('now'))
+  `).run(seniorId, balance);
+  const discountAmount = Math.round(orderAmount * 10) / 100;
+  const couponCode = `SAMARTH-${Date.now().toString(36).toUpperCase()}`;
+  db.prepare(`
+    INSERT INTO reward_redemptions
+      (senior_id, coupon_code, discount_percent, status, created_at)
+    VALUES (?, ?, 10, 'active', datetime('now'))
+  `).run(seniorId, couponCode);
+  audit("senior", "redeem", "reward", seniorId, { points: 250, discountAmount, partner: "Samarth Health Pharmacy" });
+  res.status(201).json({
+    seniorId,
+    pointsRedeemed: 250,
+    discountPercent: 10,
+    discountAmount,
+    payableAmount: Math.max(0, Math.round((orderAmount - discountAmount) * 100) / 100),
+    couponCode,
+    partner: "Samarth Health Pharmacy",
+    balanceAfter: balance
+  });
+});
+
+app.post("/api/pharmacy/orders", (req, res) => {
+  const seniorId = validId(req.body.seniorId);
+  if (!seniorId || !seniorExists(seniorId)) return res.status(404).json({ error: "Senior not found" });
+  if (!Array.isArray(req.body.items) || req.body.items.length === 0) {
+    return res.status(400).json({ error: "At least one medicine item is required" });
+  }
+  if (!req.body.items.every(item => typeof item.name === "string" && item.name.trim() && Number(item.price) > 0)) {
+    return res.status(400).json({ error: "Each medicine item requires a valid name and price" });
+  }
+  const orderAmount = Math.round(req.body.items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity || 1), 0) * 100) / 100;
+  let discountAmount = 0;
+  let couponCode = req.body.couponCode ? String(req.body.couponCode).trim() : null;
+  if (couponCode) {
+    const redemption = db.prepare(`
+      SELECT * FROM reward_redemptions
+      WHERE senior_id=? AND coupon_code=? AND status='active'
+    `).get(seniorId, couponCode);
+    if (!redemption) return res.status(400).json({ error: "Invalid or already-used reward coupon" });
+    discountAmount = Math.round(orderAmount * redemption.discount_percent) / 100;
+    db.prepare("UPDATE reward_redemptions SET status='used' WHERE id=?").run(redemption.id);
+  } else {
+    couponCode = null;
+  }
+  const payableAmount = Math.round((orderAmount - discountAmount) * 100) / 100;
+  const result = db.prepare(`
+    INSERT INTO pharmacy_orders
+      (senior_id, partner, items, order_amount, discount_amount, payable_amount, coupon_code, status, created_at)
+    VALUES (?, 'Samarth Health Pharmacy', ?, ?, ?, ?, ?, 'confirmed', datetime('now'))
+  `).run(seniorId, JSON.stringify(req.body.items), orderAmount, discountAmount, payableAmount, couponCode);
+  audit("senior", "order", "pharmacy", seniorId, { partner: "Samarth Health Pharmacy", orderId: result.lastInsertRowid, discountAmount });
+  res.status(201).json({
+    id: result.lastInsertRowid,
+    seniorId,
+    partner: "Samarth Health Pharmacy",
+    items: req.body.items,
+    orderAmount,
+    discountPercent: couponCode ? 10 : 0,
+    discountAmount,
+    payableAmount,
+    status: "confirmed",
+    deliveryPartnerOnly: "Samarth Health Pharmacy"
+  });
 });
 
 app.get("/api/operations", (req, res) => {

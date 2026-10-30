@@ -19,6 +19,10 @@ const state = {
   memberSenior: 1,
   memberVitalsHistory: [],
   memberUpdates: [],
+  rewards: null,
+  pharmacyCoupon: null,
+  pharmacyOrderDraft: null,
+  checkinReward: null,
   checkinAnswers: [],
   voiceStatus: "",
   voiceRecognition: null,
@@ -344,6 +348,12 @@ view.addEventListener("click", e => {
   if (d.memberSubmit) {
     submitMemberUpdate(state);
   }
+  if (d.redeemRewards) {
+    redeemRewardPoints(state.memberSenior || 1);
+  }
+  if (d.placePharmacyOrder) {
+    placePharmacyOrder(state.memberSenior || 1);
+  }
   if (d.memberVoice) {
     startMemberVoice();
   }
@@ -424,13 +434,15 @@ async function loadSeniorsFromApi() {
 async function loadMemberDataFromApi() {
   const seniorId = state.memberSenior || 1;
   try {
-    const [vitalsResponse, updatesResponse] = await Promise.all([
+    const [vitalsResponse, updatesResponse, rewardsResponse] = await Promise.all([
       fetch(`/api/vitals/${seniorId}`),
-      fetch(`/api/member-updates/${seniorId}`)
+      fetch(`/api/member-updates/${seniorId}`),
+      fetch(`/api/rewards/${seniorId}`)
     ]);
-    if (!vitalsResponse.ok || !updatesResponse.ok) throw new Error("Member history unavailable");
+    if (!vitalsResponse.ok || !updatesResponse.ok || !rewardsResponse.ok) throw new Error("Member history unavailable");
     state.memberVitalsHistory = await vitalsResponse.json();
     state.memberUpdates = await updatesResponse.json();
+    state.rewards = await rewardsResponse.json();
     render();
   } catch {
     state.memberVitalsHistory = [];
@@ -466,6 +478,65 @@ async function updateSeniorInApi(id, patch) {
   }
 }
 
+async function redeemRewardPoints(seniorId) {
+  const amountInput = document.getElementById("medicineOrderAmount");
+  const orderAmount = Number(amountInput?.value);
+  if (!Number.isFinite(orderAmount) || orderAmount <= 0) {
+    setApiStatus("error", state.lang === "hi" ? "मेडिसिन ऑर्डर की वैध राशि डालें।" : "Enter a valid medicine order amount.");
+    return;
+  }
+  setApiStatus("loading", "Checking Samarth Health Pharmacy redemption...");
+  try {
+    const response = await fetch(`/api/rewards/${seniorId}/redeem`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderAmount })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || "Redemption failed");
+    state.pharmacyCoupon = body.couponCode;
+    state.pharmacyOrderDraft = { medicineName: document.getElementById("medicineName")?.value?.trim(), orderAmount };
+    setApiStatus("success", `${body.discountPercent}% discount applied at ${body.partner}. Pay ₹${body.payableAmount} after redemption.`);
+    await loadMemberDataFromApi();
+    render();
+  } catch (error) {
+    apiRetryAction = () => redeemRewardPoints(seniorId);
+    setApiStatus("error", error.message || "Reward redemption failed.", true);
+  }
+}
+
+async function placePharmacyOrder(seniorId) {
+  const amountInput = document.getElementById("medicineOrderAmount");
+  const medicineInput = document.getElementById("medicineName");
+  const orderAmount = Number(amountInput?.value || state.pharmacyOrderDraft?.orderAmount);
+  const medicineName = medicineInput?.value?.trim() || state.pharmacyOrderDraft?.medicineName;
+  if (!medicineName || !Number.isFinite(orderAmount) || orderAmount <= 0) {
+    setApiStatus("error", state.lang === "hi" ? "दवा का नाम और वैध राशि डालें।" : "Enter a medicine name and valid amount.");
+    return;
+  }
+  setApiStatus("loading", "Placing order with Samarth Health Pharmacy...");
+  try {
+    const response = await fetch("/api/pharmacy/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        seniorId,
+        items: [{ name: medicineName, price: orderAmount, quantity: 1 }],
+        couponCode: state.pharmacyCoupon
+      })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || "Order could not be placed");
+    state.pharmacyCoupon = null;
+    setApiStatus("success", `Order #${body.id} confirmed. Amount paid ₹${body.payableAmount}; discount ₹${body.discountAmount}.`);
+    await loadMemberDataFromApi();
+    render();
+  } catch (error) {
+    apiRetryAction = () => placePharmacyOrder(seniorId);
+    setApiStatus("error", error.message || "Pharmacy order failed.", true);
+  }
+}
+
 async function submitCheckin(answers, voiceUsed) {
   setApiStatus("loading", "Saving check-in...");
   try {
@@ -480,7 +551,11 @@ async function submitCheckin(answers, voiceUsed) {
       })
     });
     if (!response.ok) throw new Error("Check-in submission failed");
+    const saved = await response.json();
+    state.checkinReward = saved.reward || null;
     setApiStatus("success", "Check-in submitted.");
+    await loadMemberDataFromApi();
+    render();
   } catch {
     apiRetryAction = () => submitCheckin(answers, voiceUsed);
     setApiStatus("error", "Check-in was not saved. Please retry.", true);
