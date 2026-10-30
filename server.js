@@ -143,7 +143,7 @@ if (!memberColumns.some(column => column.name === "nlp_analysis")) {
 }
 
 const seed = [
-  [1, "Anshika Priya", 78, "Mathura", "Hindi", 86, ["Slept about 3 hours less than usual", "Missed her morning BP tablet 3 times", "Mentioned dizziness and said she has not eaten", "BP is higher than her normal range"], "Call today. Ask about dizziness and meals, then review medicines.", { bp: "158/96", spo2: "96%", sugar: "142", weight: "54 kg" }, ["bp"], "I have been feeling dizzy this morning, and I have not eaten anything yet.", "Missed yesterday", [22,25,31,44,58,71,86]],
+  [1, "Preeti Sharma", 78, "Mathura", "Hindi", 86, ["Slept about 3 hours less than usual", "Missed her morning BP tablet 3 times", "Mentioned dizziness and said she has not eaten", "BP is higher than her normal range"], "Call today. Ask about dizziness and meals, then review medicines.", { bp: "158/96", spo2: "96%", sugar: "142", weight: "54 kg" }, ["bp"], "I have been feeling dizzy this morning, and I have not eaten anything yet.", "Missed yesterday", [22,25,31,44,58,71,86]],
   [2, "Priya Sharma", 82, "Jaipur", "Hindi", 79, ["Evening check-in missed 3 days in a row", "SpO2 is below her own average", "Mentioned a fall in the bathroom"], "Send a nearby coordinator within 24 hours and confirm she is safe.", { bp: "132/84", spo2: "90%", sugar: "118", weight: "63 kg" }, ["spo2"], "I slipped in the bathroom, but I am feeling better now.", "3 days ago", [30,28,35,40,52,66,79]],
   [3, "Harsh Kumar", 74, "Kochi", "English", 68, ["Sugar readings rising for five days", "Has mentioned feeling lonely", "Two calls mention skipped dinners"], "Friendly call this afternoon and flag the sugar trend for her doctor.", { bp: "126/80", spo2: "97%", sugar: "188", weight: "58 kg" }, ["sugar"], "I am okay, just don't feel like cooking.", "Today, 9:10 am", [40,38,44,47,55,62,68]],
   [4, "Gauri Singh", 80, "Ludhiana", "Hindi", 57, ["Much less movement than normal for two days", "Weight down 2 kg in two weeks"], "Schedule a call in the next two days.", { bp: "130/82", spo2: "95%", sugar: "110", weight: "69 kg" }, [], "I feel weak and have not had much appetite.", "Today, 8:40 am", [35,40,42,48,50,54,57]],
@@ -168,6 +168,8 @@ for (const row of seed) {
     JSON.stringify(row[6]), row[7], JSON.stringify(row[8]), JSON.stringify(row[9]),
     row[10], row[11], JSON.stringify(row[12]));
 }
+
+db.prepare("UPDATE seniors SET name=? WHERE id=? AND name=?").run("Preeti Sharma", 1, "Anshika Priya");
 
 const followupCount = db.prepare("SELECT COUNT(*) AS count FROM followups").get().count;
 if (followupCount === 0) {

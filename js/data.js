@@ -3,7 +3,7 @@
 
 const SENIORS = [
   {
-    id: 1, name: "Anshika Priya", age: 78, city: "Mathura", lang: "Hindi", score: 86,
+    id: 1, name: "Preeti Sharma", age: 78, city: "Mathura", lang: "Hindi", score: 86,
     trend: [22, 25, 31, 44, 58, 71, 86],
     reasons: [
       "Slept about 3 hours less than usual for the last 4 nights",
