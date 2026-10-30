@@ -24,7 +24,8 @@ function queueRow(s, selectedId, done, state) {
 function coordinatorView(state) {
   const list = SENIORS
     .filter(s => state.filter === "all" || levelOf(s.score) === state.filter)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
   const sel = list.find(s => s.id === state.selected) || list[0];
   const urgent = SENIORS.filter(s => levelOf(s.score) === "high").length;
   const hi = state.lang === "hi";

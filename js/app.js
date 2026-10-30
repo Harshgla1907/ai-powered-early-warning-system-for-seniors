@@ -12,10 +12,22 @@ const state = {
   memberConcerns: new Set(),
   memberLiteracy: "",
   memberOther: "",
-  memberSubmitted: false
+  memberSubmitted: false,
+  checkinAnswers: []
 };
 
 const view = document.getElementById("view");
+const apiStatus = document.getElementById("apiStatus");
+
+function setApiStatus(type, message, allowRetry = false) {
+  if (!apiStatus) return;
+  apiStatus.hidden = false;
+  apiStatus.className = `api-status ${type}`;
+  apiStatus.innerHTML = `<span>${message}</span>${allowRetry ? '<button type="button" data-api-retry="1">Retry</button>' : ""}`;
+  if (type !== "error") {
+    window.setTimeout(() => { apiStatus.hidden = true; }, 2200);
+  }
+}
 
 function render() {
   const route = location.hash.replace("#", "") || "coordinator";
@@ -61,7 +73,20 @@ view.addEventListener("click", e => {
   if (d.done) state.done.add(Number(d.done));
   if (d.fb) state.feedback[d.sid] = d.fb;
   if (d.lang) state.lang = d.lang;
-  if (d.answer) state.step += 1;
+  if (d.answer) {
+    const question = QUESTIONS[state.step];
+    if (question) {
+      state.checkinAnswers.push({
+        question: question[state.lang],
+        answer: ANSWERS[state.lang][Number(d.answer)]
+      });
+    }
+    if (state.step >= QUESTIONS.length - 1) {
+      submitCheckin(state.checkinAnswers, false);
+      state.checkinAnswers = [];
+    }
+    state.step += 1;
+  }
   if (d.concern) {
     state.memberConcerns.has(d.concern)
       ? state.memberConcerns.delete(d.concern)
@@ -74,10 +99,21 @@ view.addEventListener("click", e => {
   }
   if (d.memberSubmit) {
     state.memberSubmitted = true;
+    submitMemberUpdate(state);
   }
   if (d.voice) {
     state.voice = true;
-    setTimeout(() => { state.voice = false; state.step += 1; render(); }, 2000);
+    setTimeout(() => {
+      state.voice = false;
+      const question = QUESTIONS[state.step];
+      if (question) state.checkinAnswers.push({ question: question[state.lang], answer: "Voice response recorded", source: "voice" });
+      if (state.step >= QUESTIONS.length - 1) {
+        submitCheckin(state.checkinAnswers, true);
+        state.checkinAnswers = [];
+      }
+      state.step += 1;
+      render();
+    }, 2000);
   }
   if (d.restart) state.step = 0;
   render();
@@ -100,5 +136,100 @@ window.addEventListener("hashchange", () => {
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
-render();
+
+async function loadSeniorsFromApi() {
+  setApiStatus("loading", "Loading latest senior data...");
+  try {
+    const response = await fetch("/api/seniors");
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || "Could not load seniors from API");
+    }
+    const seniors = await response.json();
+    SENIORS.splice(0, SENIORS.length, ...seniors);
+    setApiStatus("success", "Senior data loaded successfully.");
+  } catch {
+    setApiStatus("error", "Backend unavailable. Showing the last available demo data.", true);
+  }
+  render();
+}
+
+async function updateSeniorInApi(id, patch) {
+  setApiStatus("loading", "Saving changes...");
+  try {
+    const response = await fetch(`/api/seniors/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch)
+    });
+    if (!response.ok) throw new Error("Could not save senior update");
+    setApiStatus("success", "Changes saved.");
+  } catch {
+    setApiStatus("error", "Changes could not be saved. Please retry.", true);
+  }
+}
+
+async function submitCheckin(answers, voiceUsed) {
+  setApiStatus("loading", "Saving check-in...");
+  try {
+    const response = await fetch("/api/checkins", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        seniorId: state.familySenior || 1,
+        language: state.lang,
+        answers,
+        voiceUsed
+      })
+    });
+    if (!response.ok) throw new Error("Check-in submission failed");
+    setApiStatus("success", "Check-in submitted.");
+  } catch {
+    setApiStatus("error", "Check-in was not saved. Please retry.", true);
+  }
+}
+
+async function submitMemberUpdate(currentState) {
+  setApiStatus("loading", "Sharing the health update...");
+  try {
+    const response = await fetch("/api/member-updates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        seniorId: 1,
+        concerns: Array.from(currentState.memberConcerns),
+        literacy: currentState.memberLiteracy,
+        notes: currentState.memberOther,
+        consent: true
+      })
+    });
+    if (!response.ok) throw new Error("Health update failed");
+    setApiStatus("success", "Health update shared with the care team.");
+  } catch {
+    setApiStatus("error", "Health update was not shared. Please retry.", true);
+  }
+}
+
+document.addEventListener("click", e => {
+  const button = e.target.closest("button[data-done], button[data-fb]");
+  if (!button) {
+    const retry = e.target.closest("button[data-api-retry]");
+    if (retry) loadSeniorsFromApi();
+    return;
+  }
+  if (button.dataset.done) updateSeniorInApi(Number(button.dataset.done), { done: true });
+  if (button.dataset.fb) {
+    setApiStatus("loading", "Saving alert feedback...");
+    fetch(`/api/alerts/${Number(button.dataset.sid)}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ useful: button.dataset.fb === "useful" })
+    }).then(response => {
+      if (!response.ok) throw new Error("Feedback failed");
+      setApiStatus("success", "Feedback saved.");
+    }).catch(() => setApiStatus("error", "Feedback could not be saved.", true));
+  }
+});
+
+loadSeniorsFromApi();
 window.scrollTo({ top: 0, behavior: "smooth" });

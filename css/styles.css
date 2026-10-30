@@ -37,6 +37,38 @@ button {
   cursor: pointer;
 }
 
+.api-status {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 50;
+  max-width: 360px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(29, 43, 42, 0.16);
+  padding: 10px 12px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.api-status.loading {
+  border-left: 4px solid var(--brand);
+}
+
+.api-status.error {
+  border-left: 4px solid var(--high);
+}
+
+.api-status button {
+  margin-left: 8px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--ink);
+  padding: 4px 8px;
+  color: #fff;
+}
+
 :focus-visible {
   outline: 3px solid var(--brand);
   outline-offset: 2px;

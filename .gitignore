@@ -7,3 +7,7 @@ Thumbs.db
 *.log
 .env
 .env.*
+
+# Dependencies and local database
+node_modules/
+samarth.db

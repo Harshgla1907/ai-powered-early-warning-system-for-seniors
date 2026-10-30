@@ -1,0 +1,28 @@
+{
+  "name": "samarth-early-warning",
+  "version": "1.0.0",
+  "description": "Frontend prototype for \"Samarth Early Warning\": an early-warning system for seniors living at home. It combines vitals, medicine records and call notes into a daily risk score compared with each senior's own baseline—not a population average. The interface is built to make the alert understandable and route it to a human; it does not diagnose. Plain HTML, CSS and JavaScript. No build step, no dependencies.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --check server.js && node --check js/data.js && node --check js/views.js && node --check js/app.js && node --check test-backend.js",
+    "test:integration": "node test-backend.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Harshgla1907/ai-powered-early-warning-system-for-seniors.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Harshgla1907/ai-powered-early-warning-system-for-seniors/issues"
+  },
+  "homepage": "https://github.com/Harshgla1907/ai-powered-early-warning-system-for-seniors#readme",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.3.0"
+  }
+}
