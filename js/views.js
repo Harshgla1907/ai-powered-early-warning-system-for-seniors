@@ -109,15 +109,15 @@ function seniorView(state) {
           <div class="senior-login-icon" aria-hidden="true">S</div>
           <p class="eyebrow">${copy(state, "Senior citizen portal", "वरिष्ठ नागरिक पोर्टल")}</p>
           <h1>${copy(state, "Welcome to Samarth", "समर्थ में आपका स्वागत है")}</h1>
-          <p class="sub">${copy(state, "Enter your Senior ID and password to begin today's check-in.", "आज का चेक-इन शुरू करने के लिए Senior ID और पासवर्ड डालें।")}</p>
-          <label for="seniorLoginId">${copy(state, "Senior ID", "सीनियर ID")}</label>
-          <input id="seniorLoginId" type="number" min="1" max="20" inputmode="numeric" placeholder="${copy(state, "Example: 1", "उदाहरण: 1")}">
-          <label for="seniorLoginName">${copy(state, "Name / Username", "नाम / यूज़रनेम")}</label>
-          <input id="seniorLoginName" type="text" autocomplete="name" placeholder="${copy(state, "Enter your full name", "अपना पूरा नाम डालें")}">
+          <p class="sub">${copy(state, "Enter your registered username and password to begin today's check-in.", "आज का चेक-इन शुरू करने के लिए रजिस्टर्ड यूज़रनेम और पासवर्ड डालें।")}</p>
+          <label for="seniorRegisterName">${copy(state, "Full name (new registration only)", "पूरा नाम (केवल नया रजिस्ट्रेशन)")}</label>
+          <input id="seniorRegisterName" type="text" autocomplete="name" placeholder="${copy(state, "Enter your full name", "अपना पूरा नाम डालें")}">
+          <label for="seniorLoginName">${copy(state, "Username", "यूज़रनेम")}</label>
+          <input id="seniorLoginName" type="text" autocomplete="username" placeholder="${copy(state, "Choose your username", "अपना यूज़रनेम चुनें")}">
           <label for="seniorLoginPassword">${copy(state, "Password", "पासवर्ड")}</label>
           <input id="seniorLoginPassword" type="password" placeholder="${copy(state, "Enter password", "पासवर्ड डालें")}">
           <button type="button" class="btn primary senior-login-button" data-senior-login="1">${copy(state, "Enter senior portal", "सीनियर पोर्टल में प्रवेश करें")}</button>
-          <p class="hint">${copy(state, "Use any password; it will be saved on this device.", "कोई भी पासवर्ड डालें; यह इस device पर सुरक्षित रहेगा।")}</p>
+          <button type="button" class="btn" data-senior-register="1">${copy(state, "Register as a new senior", "नए वरिष्ठ के रूप में रजिस्टर करें")}</button>
         </section>
       </div>`;
   }
@@ -324,10 +324,10 @@ function familyView(state) {
         <section class="panel family-login-card">
           <p class="eyebrow">${copy(state, "Family access", "पारिवारिक पहुँच")}</p>
           <h1>${copy(state, "Open the family portal", "पारिवारिक पोर्टल खोलें")}</h1>
-          <p class="sub">${copy(state, "Enter the senior citizen ID and family password to view approved health information.", "अनुमोदित स्वास्थ्य जानकारी देखने के लिए वरिष्ठ नागरिक ID और परिवार पासवर्ड डालें।")}</p>
-          <label for="familySeniorId">${copy(state, "Senior citizen ID", "वरिष्ठ नागरिक ID")}</label>
-          <input id="familySeniorId" type="number" min="1" max="14" placeholder="1">
-          <label for="familyPassword">${copy(state, "Family password", "परिवार पासवर्ड")}</label>
+          <p class="sub">${copy(state, "Enter the senior's registered username and password to view approved health information.", "अनुमोदित स्वास्थ्य जानकारी देखने के लिए वरिष्ठ का रजिस्टर्ड यूज़रनेम और पासवर्ड डालें।")}</p>
+          <label for="familyUsername">${copy(state, "Senior username", "वरिष्ठ यूज़रनेम")}</label>
+          <input id="familyUsername" type="text" autocomplete="username" placeholder="${copy(state, "Enter senior username", "वरिष्ठ यूज़रनेम डालें")}">
+          <label for="familyPassword">${copy(state, "Password", "पासवर्ड")}</label>
           <input id="familyPassword" type="password" placeholder="${copy(state, "Enter password", "पासवर्ड डालें")}">
           <button type="button" class="btn primary family-login-button" data-family-login="1">${copy(state, "Access family information", "पारिवारिक जानकारी देखें")}</button>
           <p class="hint">${copy(state, "Demo password: samarth123", "डेमो पासवर्ड: samarth123")}</p>

@@ -148,6 +148,10 @@ const memberColumns = db.prepare("PRAGMA table_info(member_updates)").all();
 if (!memberColumns.some(column => column.name === "nlp_analysis")) {
   db.exec("ALTER TABLE member_updates ADD COLUMN nlp_analysis TEXT");
 }
+const userColumns = db.prepare("PRAGMA table_info(users)").all();
+if (!userColumns.some(column => column.name === "senior_id")) {
+  db.exec("ALTER TABLE users ADD COLUMN senior_id INTEGER");
+}
 
 const seed = [
   [1, "Preeti Sharma", 78, "Mathura", "Hindi", 86, ["Slept about 3 hours less than usual", "Missed her morning BP tablet 3 times", "Mentioned dizziness and said she has not eaten", "BP is higher than her normal range"], "Call today. Ask about dizziness and meals, then review medicines.", { bp: "158/96", spo2: "96%", sugar: "142", weight: "54 kg" }, ["bp"], "I have been feeling dizzy this morning, and I have not eaten anything yet.", "Missed yesterday", [22,25,31,44,58,71,86]],
@@ -303,6 +307,7 @@ userInsert.run("family", "samarth123", "family");
 for (const senior of db.prepare("SELECT id FROM seniors").all()) {
   userInsert.run(`senior${senior.id}`, "samarth123", "senior");
 }
+db.prepare("UPDATE users SET senior_id = CAST(substr(username, 7) AS INTEGER) WHERE role = 'senior' AND username LIKE 'senior%' AND senior_id IS NULL").run();
 
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -316,39 +321,47 @@ function requireRole(...roles) {
   };
 }
 
+app.post("/api/auth/register", (req, res) => {
+  const username = String(req.body?.username || "").trim().toLocaleLowerCase();
+  const password = String(req.body?.password || "").trim();
+  const name = String(req.body?.name || "").trim();
+  if (!/^[a-z0-9._-]{3,40}$/.test(username)) {
+    return res.status(400).json({ error: "Username must contain 3-40 letters, numbers, dots, underscores or hyphens" });
+  }
+  if (!password || password.length < 4) {
+    return res.status(400).json({ error: "Password must contain at least 4 characters" });
+  }
+  if (!name) return res.status(400).json({ error: "Name is required" });
+  if (db.prepare("SELECT 1 FROM users WHERE lower(username) = ?").get(username)) {
+    return res.status(409).json({ error: "Username already exists" });
+  }
+  const seniorId = Number(db.prepare("SELECT COALESCE(MAX(id), 0) + 1 AS id FROM seniors").get().id);
+  db.prepare(`INSERT INTO seniors
+    (id, name, age, city, lang, score, reasons, action, vitals, off_signals, note, last_checkin, trend)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      seniorId, name, 70, "Samarth Service Area", "Hindi", 10,
+      JSON.stringify(["New senior account registered"]), "Complete the first check-in.",
+      JSON.stringify({ bp: "120/80", spo2: "98%", sugar: "100", weight: "60 kg" }),
+      JSON.stringify([]), "New account ready for check-in.", "Not checked in yet",
+      JSON.stringify([10, 10, 10, 10, 10, 10, 10])
+    );
+  db.prepare("INSERT INTO users (username, password, role, senior_id) VALUES (?, ?, 'senior', ?)")
+    .run(username, password, seniorId);
+  audit(username, "register", "senior", seniorId, { name });
+  res.status(201).json({
+    success: true,
+    senior: { id: seniorId, name, username }
+  });
+});
+
 app.post("/api/auth/login", (req, res) => {
   const { username, name, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: "Username and password required" });
   const seniorMatch = /^senior([1-9]|1[0-9]|20)$/.exec(String(username));
-  if (seniorMatch && String(password).trim()) {
-    if (!String(name || "").trim()) {
-      return res.status(400).json({ error: "Senior name is required" });
-    }
-    const seniorId = Number(seniorMatch[1]);
-    let senior = db.prepare("SELECT id, name FROM seniors WHERE id = ?").get(seniorId);
-    if (senior && senior.name.toLocaleLowerCase() !== String(name).trim().toLocaleLowerCase()) {
-      return res.status(401).json({ error: "Senior ID and name do not match" });
-    }
-    if (!senior) {
-      const seniorName = String(name).trim();
-      db.prepare(`INSERT INTO seniors
-        (id, name, age, city, lang, score, reasons, action, vitals, off_signals, note, last_checkin, trend)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-          seniorId, seniorName, 70, "Samarth Service Area", "Hindi", 10,
-          JSON.stringify(["No current concern detected"]), "Continue routine check-ins.",
-          JSON.stringify({ bp: "120/80", spo2: "98%", sugar: "100", weight: "60 kg" }),
-          JSON.stringify([]), "Ready for today's check-in.", "Not checked in yet",
-          JSON.stringify([10, 10, 10, 10, 10, 10, 10])
-        );
-      senior = db.prepare("SELECT id, name FROM seniors WHERE id = ?").get(seniorId);
-    }
-    const user = { id: seniorId, username: `senior${seniorId}`, role: "senior", name: senior.name };
-    const token = crypto.randomBytes(24).toString("hex");
-    sessions.set(token, user);
-    audit(user.username, "login", "session", null, { role: user.role });
-    return res.json({ token, user });
-  }
-  const user = db.prepare("SELECT id, username, role FROM users WHERE username = ? AND password = ?").get(username, password);
+  const normalizedUsername = String(username).trim().toLocaleLowerCase();
+  const user = db.prepare(
+    "SELECT id, username, role, senior_id AS seniorId FROM users WHERE lower(username) = ? AND password = ?"
+  ).get(normalizedUsername, String(password));
   if (!user) return res.status(401).json({ error: "Invalid credentials" });
   const token = crypto.randomBytes(24).toString("hex");
   sessions.set(token, user);

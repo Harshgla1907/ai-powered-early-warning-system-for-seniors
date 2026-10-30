@@ -377,6 +377,9 @@ view.addEventListener("click", e => {
   if (d.seniorLogin) {
     loginSeniorPortal();
   }
+  if (d.seniorRegister) {
+    registerSeniorPortal();
+  }
   if (d.seniorLogout) {
     localStorage.removeItem("samarthSeniorSession");
     state.seniorAuthenticated = false;
@@ -567,20 +570,12 @@ async function redeemRewardPoints(seniorId) {
 }
 
 async function loginSeniorPortal() {
-  const idInput = document.getElementById("seniorLoginId");
   const nameInput = document.getElementById("seniorLoginName");
   const passwordInput = document.getElementById("seniorLoginPassword");
-  const seniorId = Number(idInput?.value);
-  const seniorName = nameInput?.value?.trim();
+  const username = nameInput?.value?.trim().toLocaleLowerCase();
   const password = passwordInput?.value?.trim();
-  if (!/^(?:[1-9]|1[0-9]|20)$/.test(String(idInput?.value || "")) || !seniorName || !password) {
-    setApiStatus("error", state.lang === "hi" ? "वैध सीनियर ID और पासवर्ड डालें।" : "Enter a valid Senior ID and password.");
-    return;
-  }
-  const knownSenior = SENIORS.find(item => item.id === seniorId);
-  const senior = knownSenior || { id: seniorId, name: seniorName };
-  if (knownSenior && knownSenior.name.toLocaleLowerCase() !== seniorName.toLocaleLowerCase()) {
-    setApiStatus("error", state.lang === "hi" ? "ID और नाम मेल नहीं खाते।" : "Senior ID and name do not match.");
+  if (!username || !password) {
+    setApiStatus("error", state.lang === "hi" ? "यूज़रनेम और पासवर्ड डालें।" : "Enter username and password.");
     return;
   }
   setApiStatus("loading", "Signing in to the senior portal...");
@@ -588,18 +583,19 @@ async function loginSeniorPortal() {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: `senior${seniorId}`, name: seniorName, password })
+      body: JSON.stringify({ username, password })
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error || "Invalid senior credentials");
+    if (body.user.role !== "senior" || !body.user.seniorId) throw new Error("This account is not registered as a senior");
     state.seniorAuthenticated = true;
     state.seniorToken = body.token;
-    state.seniorAccessId = seniorId;
-    state.familySenior = seniorId;
-    state.memberSenior = seniorId;
-    localStorage.setItem("samarthSeniorSession", JSON.stringify({ seniorId, seniorName, password }));
+    state.seniorAccessId = body.user.seniorId;
+    state.familySenior = body.user.seniorId;
+    state.memberSenior = body.user.seniorId;
+    localStorage.setItem("samarthSeniorSession", JSON.stringify({ username, password }));
     await loadMemberDataFromApi();
-    setApiStatus("success", state.lang === "hi" ? `${senior.name}, आपका पोर्टल खुल गया।` : `${senior.name}, your portal is ready.`);
+    setApiStatus("success", state.lang === "hi" ? "आपका पोर्टल खुल गया।" : "Your portal is ready.");
     render();
   } catch (error) {
     apiRetryAction = loginSeniorPortal;
@@ -607,14 +603,37 @@ async function loginSeniorPortal() {
   }
 }
 
+async function registerSeniorPortal() {
+  const name = document.getElementById("seniorRegisterName")?.value?.trim();
+  const username = document.getElementById("seniorLoginName")?.value?.trim().toLocaleLowerCase();
+  const password = document.getElementById("seniorLoginPassword")?.value?.trim();
+  if (!name || !username || !password) {
+    setApiStatus("error", state.lang === "hi" ? "नाम, यूज़रनेम और पासवर्ड डालें।" : "Enter name, username and password.");
+    return;
+  }
+  setApiStatus("loading", "Registering senior account...");
+  try {
+    const response = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, username, password })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || "Registration failed");
+    setApiStatus("success", state.lang === "hi" ? "रजिस्ट्रेशन पूरा हुआ। अब login करें।" : "Registration complete. You can now login.");
+  } catch (error) {
+    apiRetryAction = registerSeniorPortal;
+    setApiStatus("error", error.message || "Registration failed.", true);
+  }
+}
+
 async function loginFamilyPortal() {
-  const idInput = document.getElementById("familySeniorId");
+  const usernameInput = document.getElementById("familyUsername");
   const passwordInput = document.getElementById("familyPassword");
-  const seniorId = Number(idInput?.value);
+  const username = usernameInput?.value?.trim().toLocaleLowerCase();
   const password = passwordInput?.value?.trim();
-  const seniorExists = SENIORS.some(senior => senior.id === seniorId);
-  if (!seniorExists || !password) {
-    setApiStatus("error", state.lang === "hi" ? "वैध वरिष्ठ ID और पासवर्ड डालें।" : "Enter a valid senior ID and password.");
+  if (!username || !password) {
+    setApiStatus("error", state.lang === "hi" ? "वरिष्ठ यूज़रनेम और पासवर्ड डालें।" : "Enter senior username and password.");
     return;
   }
   setApiStatus("loading", "Verifying family access...");
@@ -622,14 +641,15 @@ async function loginFamilyPortal() {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: "family", password })
+      body: JSON.stringify({ username, password })
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error || "Invalid family credentials");
+    if (body.user.role !== "senior" || !body.user.seniorId) throw new Error("Use the registered senior account credentials");
     state.familyAuthenticated = true;
     state.familyToken = body.token;
-    state.familyAccessId = seniorId;
-    state.familySenior = seniorId;
+    state.familyAccessId = body.user.seniorId;
+    state.familySenior = body.user.seniorId;
     setApiStatus("success", state.lang === "hi" ? "पारिवारिक पहुँच सफल।" : "Family access confirmed.");
     render();
   } catch (error) {
@@ -773,7 +793,7 @@ async function restoreSeniorSession() {
   } catch {
     saved = null;
   }
-  if (!saved || !/^(?:[1-9]|1[0-9]|20)$/.test(String(saved.seniorId)) || !String(saved.seniorName || "").trim() || !String(saved.password || "").trim()) {
+  if (!saved || !String(saved.username || "").trim() || !String(saved.password || "").trim()) {
     return;
   }
   try {
@@ -781,18 +801,18 @@ async function restoreSeniorSession() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        username: `senior${saved.seniorId}`,
-        name: saved.seniorName,
+        username: saved.username,
         password: saved.password
       })
     });
     if (!response.ok) return;
     const body = await response.json();
+    if (body.user.role !== "senior" || !body.user.seniorId) return;
     state.seniorAuthenticated = true;
     state.seniorToken = body.token;
-    state.seniorAccessId = saved.seniorId;
-    state.familySenior = saved.seniorId;
-    state.memberSenior = saved.seniorId;
+    state.seniorAccessId = body.user.seniorId;
+    state.familySenior = body.user.seniorId;
+    state.memberSenior = body.user.seniorId;
   } catch {
     localStorage.removeItem("samarthSeniorSession");
   }
